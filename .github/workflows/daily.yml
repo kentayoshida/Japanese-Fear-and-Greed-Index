@@ -27,9 +27,10 @@ jobs:
     env:
       TZ: Asia/Tokyo
       # J-Quants 認証情報（GitHub Secrets で設定。コードに直書きしない §6）
+      # v2 は APIキー方式（x-api-key）。JQUANTS_API_KEY を使用。
+      JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+      # 後方互換（v1 名・任意）
       JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
-      JQUANTS_MAIL_ADDRESS: ${{ secrets.JQUANTS_MAIL_ADDRESS }}
-      JQUANTS_PASSWORD: ${{ secrets.JQUANTS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
