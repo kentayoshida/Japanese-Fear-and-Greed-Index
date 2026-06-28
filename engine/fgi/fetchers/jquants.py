@@ -129,18 +129,35 @@ class JQuantsClient:
             raise JQuantsError(f"index_option_chain: no data for date={date}")
         return pd.DataFrame(rows)
 
-    def short_ratio(self, from_date: str | None = None, to_date: str | None = None,
-                    s33: str | None = None, date: str | None = None) -> pd.DataFrame:
-        """業種別空売り比率。#7 空売り比率の素材。/markets/short-ratio。
+    def _discover_short_sectors(self) -> list[str]:
+        """直近の営業日から空売り比率の業種コード(S33)一覧を取得する。"""
+        from datetime import datetime, timedelta, timezone as _tz
 
-        date 指定でその日の全業種、s33 指定で当該業種の期間レンジを取得（仕様 v2）。
-        市場全体比率は derive 側で業種を集計して算出する。
+        jst_now = datetime.now(_tz.utc) + timedelta(hours=9)
+        for back in range(1, 10):
+            day = jst_now - timedelta(days=back)
+            if day.weekday() >= 5:
+                continue
+            rows = self._get("/markets/short-ratio", {"date": day.strftime("%Y-%m-%d")})
+            if rows:
+                return sorted({str(r["S33"]) for r in rows if "S33" in r})
+        raise JQuantsError("short-ratio: 業種コードの探索に失敗")
+
+    def short_ratio_market_df(self, from_date: str, to_date: str | None = None) -> pd.DataFrame:
+        """市場全体の空売り比率算出用に、全業種×期間レンジの行を取得して連結する。
+
+        /markets/short-ratio は from/to を s33 指定時のみ受け付けるため、業種ごとに
+        レンジ取得して縦結合する（業種数ぶんの呼び出し＝約34回）。
         """
-        params = {"from": from_date, "to": to_date, "s33": s33, "date": date}
-        rows = self._get("/markets/short-ratio", params)
-        if not rows:
-            raise JQuantsError("short_ratio: no data")
-        return pd.DataFrame(rows)
+        sectors = self._discover_short_sectors()
+        frames: list[pd.DataFrame] = []
+        for s33 in sectors:
+            rows = self._get("/markets/short-ratio", {"s33": s33, "from": from_date, "to": to_date})
+            if rows:
+                frames.append(pd.DataFrame(rows))
+        if not frames:
+            raise JQuantsError("short_ratio_market_df: no data")
+        return pd.concat(frames, ignore_index=True)
 
 
 def now_jst_date() -> str:

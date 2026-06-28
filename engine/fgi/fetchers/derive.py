@@ -37,23 +37,56 @@ def new_high_low_net(new_highs: pd.Series, new_lows: pd.Series) -> pd.Series:
     return net
 
 
-def put_call_ratio(option_df: pd.DataFrame) -> pd.Series:
+def put_call_ratio(
+    option_df: pd.DataFrame,
+    *,
+    date_col: str = "Date",
+    volume_col: str = "Vo",
+    putcall_col: str = "PCDiv",
+    put_value: str = "1",
+    call_value: str = "2",
+) -> pd.Series:
     """#5 日経225オプション Put/Call レシオ（出来高ベース）。
 
-    option_df は J-Quants 日経225オプション四本値（全ストライク・日次）。
-    期待カラム: 'Date', 'PutCallDivision'(1=Put?/2=Call? は API 仕様で確認), 'Volume'。
+    option_df は J-Quants v2 /derivatives/bars/daily/options/225（全ストライク・日次）。
+    v2 カラム: 'Date', 'Vo'(出来高), 'PCDiv'(プット/コール区分)。
     日付ごとに put 出来高合計 ÷ call 出来高合計。
 
-    ※ PutCallDivision の値の意味は契約後 API ドキュメントで確認し調整すること。
+    ※ PCDiv の値（1=Put / 2=Call）は J-Quants 仕様準拠。万一逆なら put_value/call_value で調整。
     """
     df = option_df.copy()
-    df["Date"] = pd.to_datetime(df["Date"])
-    df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0.0)
-    # 暫定マッピング（要確認）: PutCallDivision 1=Put, 2=Call
-    puts = df[df["PutCallDivision"].astype(str) == "1"].groupby("Date")["Volume"].sum()
-    calls = df[df["PutCallDivision"].astype(str) == "2"].groupby("Date")["Volume"].sum()
+    df[date_col] = pd.to_datetime(df[date_col])
+    df[volume_col] = pd.to_numeric(df[volume_col], errors="coerce").fillna(0.0)
+    pcd = df[putcall_col].astype(str)
+    puts = df[pcd == put_value].groupby(date_col)[volume_col].sum()
+    calls = df[pcd == call_value].groupby(date_col)[volume_col].sum()
     ratio = (puts / calls.replace(0, pd.NA)).dropna()
     ratio.name = "put_call_ratio"
+    return ratio.sort_index()
+
+
+def short_selling_market_ratio(
+    df: pd.DataFrame,
+    *,
+    date_col: str = "Date",
+    sell_ex_short: str = "SellExShortVa",
+    short_with_res: str = "ShrtWithResVa",
+    short_no_res: str = "ShrtNoResVa",
+) -> pd.Series:
+    """#7 市場全体の空売り比率（％）。J-Quants /markets/short-ratio の業種別金額から算出。
+
+    空売り比率 = (規制あり空売り + 規制なし空売り) ÷ (実売り + 空売り合計) × 100。
+    日付ごとに全業種（33業種 + ETF/REIT=9999）を合算して市場全体値とする。
+    """
+    d = df.copy()
+    d[date_col] = pd.to_datetime(d[date_col])
+    for c in (sell_ex_short, short_with_res, short_no_res):
+        d[c] = pd.to_numeric(d[c], errors="coerce").fillna(0.0)
+    g = d.groupby(date_col)[[sell_ex_short, short_with_res, short_no_res]].sum()
+    short = g[short_with_res] + g[short_no_res]
+    total = g[sell_ex_short] + short
+    ratio = (short / total.replace(0, pd.NA) * 100.0).dropna()
+    ratio.name = "short_selling_ratio"
     return ratio.sort_index()
 
 

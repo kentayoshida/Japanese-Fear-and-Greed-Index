@@ -44,16 +44,35 @@ def test_new_high_low_net():
     assert net.iloc[-1] == 10
 
 
-def test_put_call_ratio():
+def test_put_call_ratio_v2_columns():
+    # v2 カラム: Vo(出来高), PCDiv(1=Put,2=Call)
     df = pd.DataFrame(
         {
             "Date": ["2026-06-25", "2026-06-25", "2026-06-25", "2026-06-25"],
-            "PutCallDivision": ["1", "1", "2", "2"],
-            "Volume": [300, 300, 200, 200],
+            "PCDiv": ["1", "1", "2", "2"],
+            "Vo": [300, 300, 200, 200],
         }
     )
     r = put_call_ratio(df)
     assert abs(r.iloc[-1] - (600 / 400)) < 1e-6
+
+
+def test_short_selling_market_ratio():
+    from fgi.fetchers.derive import short_selling_market_ratio
+
+    # 2業種・1日。空売り比率 = (規制あり+規制なし) / (実売り+空売り計) * 100
+    df = pd.DataFrame(
+        {
+            "Date": ["2026-06-25", "2026-06-25"],
+            "S33": ["0050", "1050"],
+            "SellExShortVa": [600.0, 400.0],   # 実売り合計 1000
+            "ShrtWithResVa": [300.0, 100.0],   # 規制あり 400
+            "ShrtNoResVa": [100.0, 100.0],     # 規制なし 200
+        }
+    )
+    r = short_selling_market_ratio(df)
+    # short=600, total=1600 → 37.5%
+    assert abs(r.iloc[-1] - 37.5) < 1e-6
 
 
 def test_safe_haven_equity_outperform():
