@@ -1,9 +1,9 @@
 {
   "as_of": "2026-06-26",
-  "score": 22.0,
-  "band": "Extreme Fear",
-  "band_label_ja": "極度の恐怖",
-  "coverage": 1,
+  "score": 25.4,
+  "band": "Fear",
+  "band_label_ja": "恐怖",
+  "coverage": 3,
   "n_indicators": 8,
   "lookback_days": 252,
   "components": [
@@ -13,7 +13,7 @@
       "dimension": "momentum",
       "raw": 6.093479,
       "score": 22.0238,
-      "weight": 1.0,
+      "weight": 0.5,
       "inverted": false,
       "stale": false
     },
@@ -51,11 +51,11 @@
       "id": "put_call_ratio",
       "label": "日経225オプション Put/Call レシオ",
       "dimension": "hedge_positioning",
-      "raw": null,
-      "score": null,
-      "weight": 0.0,
+      "raw": 2.048804,
+      "score": 17.5676,
+      "weight": 0.25,
       "inverted": true,
-      "stale": true
+      "stale": false
     },
     {
       "id": "margin_pl_ratio",
@@ -71,11 +71,11 @@
       "id": "short_selling_ratio",
       "label": "空売り比率（東証）",
       "dimension": "hedge_positioning",
-      "raw": null,
-      "score": null,
-      "weight": 0.0,
+      "raw": 39.292468,
+      "score": 39.881,
+      "weight": 0.25,
       "inverted": true,
-      "stale": true
+      "stale": false
     },
     {
       "id": "safe_haven",
@@ -90,15 +90,13 @@
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-06-28T10:34:39.989496+00:00",
+  "generated_at": "2026-06-28T14:41:41.209787+00:00",
   "mode": "real",
   "fetch_errors": {
     "advance_decline_25": "要確認: 東証 値上がり/値下がり銘柄数のソース確認（株探/日経・ToS）が必要",
     "new_high_low": "要確認: 東証 新高値/新安値銘柄数のソース確認が必要",
     "nikkei_vi": "要確認: 日経VI 公式ソース（JPX/大阪取引所 CSV/Excel）の結線が必要",
-    "put_call_ratio": "要確認: J-Quants 日経225オプション四本値（契約・APIキー発行）が必要",
     "margin_pl_ratio": "要確認: 松井証券『投資指標（店内）』日次値のToS確認・結線が必要",
-    "short_selling_ratio": "要確認: J-Quants 業種別空売り比率（契約・APIキー発行）が必要",
     "safe_haven": "要確認: 10年JGBトータルリターン系列のソース確認・結線が必要"
   }
 }
