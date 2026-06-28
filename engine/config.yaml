@@ -111,8 +111,8 @@ output:
 # -----------------------------------------------------------------------------
 sources:
   jquants:
-    enabled: false   # J-Quants 契約・APIキー発行後に true へ（Phase 2）
-    base_url: "https://api.jquants.com/v1"
+    enabled: true    # v2 APIキー方式。Secrets に JQUANTS_API_KEY（または JQUANTS_REFRESH_TOKEN）を設定
+    base_url: "https://api.jquants.com/v2"
     cache_dir: "data/cache/jquants"
   stooq:
     nikkei_symbol: "^nkx"   # 日経225（stooq 表記）

@@ -39,14 +39,17 @@ def _nikkei_close_real(config: Config) -> pd.Series:
 
     どちらも到達できなければ FetchError。
     """
-    # 1) J-Quants（契約後・一次データ優先）
+    # 1) J-Quants v2（一次データ優先）
+    from datetime import datetime, timedelta
+
     from .fetchers.jquants import JQuantsClient
 
     if JQuantsClient.is_configured():
         try:
             client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
-            df = client.index_ohlc(code="0000")  # 日経平均（コードは契約後ドキュメントで確認）
-            return df["Close"]
+            # 125日移動平均＋252日パーセンタイルに十分な履歴（約2.5年）を取得
+            from_date = (datetime.utcnow() - timedelta(days=900)).strftime("%Y-%m-%d")
+            return client.index_close(code="0000", from_date=from_date)  # 日経平均
         except Exception as exc:  # noqa: BLE001
             raise FetchError(f"nikkei_close(J-Quants): {exc}") from exc
 
