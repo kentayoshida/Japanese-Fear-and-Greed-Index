@@ -106,7 +106,8 @@ class JQuantsClient:
             raise JQuantsError(f"index_close: no data for code={code}")
         df = pd.DataFrame(rows)
         date_col = self._find_col(df.columns, "Date")
-        close_col = self._find_col(df.columns, "Close", "AdjustmentClose")
+        # v2 の指数四本値は OHLC が略記（O/H/L/C）。Close/C/AdjustmentClose の順で検出。
+        close_col = self._find_col(df.columns, "Close", "C", "AdjustmentClose")
         if not date_col or not close_col:
             raise JQuantsError(
                 f"index_close: Date/Close 列が見つからない columns={list(df.columns)}"
