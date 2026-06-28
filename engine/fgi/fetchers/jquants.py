@@ -118,6 +118,29 @@ class JQuantsClient:
         ).dropna().sort_index()
         return s
 
+    def equity_adj_close(self, code: str, from_date: str | None = None,
+                         to_date: str | None = None) -> pd.Series:
+        """個別銘柄/ETF の調整後終値（AdjC）系列。#8 の債券レッグ（国債ETF）等に使う。
+
+        /equities/bars/daily から取得。調整後終値はトータルリターン近似（分配・分割調整済み）。
+        """
+        rows = self._get("/equities/bars/daily", {"code": code, "from": from_date, "to": to_date})
+        if not rows:
+            raise JQuantsError(f"equity_adj_close: no data for code={code}")
+        df = pd.DataFrame(rows)
+        date_col = self._find_col(df.columns, "Date")
+        # 調整後終値を優先（AdjC）。無ければ素の終値。
+        close_col = self._find_col(df.columns, "AdjC", "AdjustmentClose", "Close", "C")
+        if not date_col or not close_col:
+            raise JQuantsError(
+                f"equity_adj_close: Date/AdjC 列が見つからない columns={list(df.columns)}"
+            )
+        s = pd.Series(
+            pd.to_numeric(df[close_col], errors="coerce").values,
+            index=pd.to_datetime(df[date_col]),
+        ).dropna().sort_index()
+        return s
+
     def index_option_chain(self, date: str) -> pd.DataFrame:
         """日経225オプション四本値（指定日・全ストライク）。#5 Put/Call の素材。
 

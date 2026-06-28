@@ -162,6 +162,30 @@ def _provide_short_ratio(config: Config, client, series: dict, errors: dict) -> 
         errors["short_selling_ratio"] = f"short_selling_ratio: {exc}"
 
 
+def _provide_safe_haven(config: Config, client, series: dict, errors: dict) -> None:
+    """#8 セーフヘイブン：株式(TOPIX) − 債券(国債ETF調整後終値) の20日リターン差。"""
+    from datetime import datetime, timedelta
+
+    from .fetchers.derive import safe_haven
+
+    try:
+        jq = config.sources.get("jquants", {})
+        eq_code = jq.get("equity_index_code", "0000")
+        bond_code = jq.get("bond_etf_code", "2510")
+        from_date = (datetime.utcnow() + timedelta(hours=9)
+                     - timedelta(days=int(config.lookback_days * 1.6) + 40)).strftime("%Y-%m-%d")
+        eq = client.index_close(code=eq_code, from_date=from_date)      # TOPIX 現物
+        bond = client.equity_adj_close(bond_code, from_date=from_date)  # 国債ETF 調整後終値
+        sh = safe_haven(eq, bond, window=20)
+        if len(sh) == 0:
+            raise FetchError("safe_haven: 系列が空（株式/債券の重なり日数不足）")
+        series["safe_haven"] = IndicatorSeries("safe_haven", sh, "jquants_v2")
+    except FetchError as exc:
+        errors["safe_haven"] = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        errors["safe_haven"] = f"safe_haven: {exc}"
+
+
 def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     from .fetchers.jquants import JQuantsClient
 
@@ -184,17 +208,17 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
         _provide_put_call(config, client, series, errors)
         _provide_short_ratio(config, client, series, errors)
+        _provide_safe_haven(config, client, series, errors)
     else:
-        errors["put_call_ratio"] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
-        errors["short_selling_ratio"] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
+        for k in ("put_call_ratio", "short_selling_ratio", "safe_haven"):
+            errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
-    # ---- #2/#3/#4/#6/#8 未結線：要ソース確認 ----
+    # ---- #2/#3/#4/#6 未結線：要ソース確認 ----
     pending = {
-        "advance_decline_25": "東証 値上がり/値下がり銘柄数のソース確認（株探/日経・ToS）が必要",
-        "new_high_low": "東証 新高値/新安値銘柄数のソース確認が必要",
-        "nikkei_vi": "日経VI 公式ソース（JPX/大阪取引所 CSV/Excel）の結線が必要",
-        "margin_pl_ratio": "松井証券『投資指標（店内）』日次値のToS確認・結線が必要",
-        "safe_haven": "10年JGBトータルリターン系列のソース確認・結線が必要",
+        "advance_decline_25": "東証プライム 騰落（J-Quants 全銘柄四本値から自前集計予定）",
+        "new_high_low": "東証全体 新高値/新安値（J-Quants 全銘柄四本値から自前集計予定）",
+        "nikkei_vi": "日経VI（N145 を J-Quants で確認→不可なら stooq N145.JP）",
+        "margin_pl_ratio": "松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み）",
     }
     for ind_id, reason in pending.items():
         errors[ind_id] = f"要確認: {reason}"

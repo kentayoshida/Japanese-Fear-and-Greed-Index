@@ -69,6 +69,20 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"取得失敗: {exc}")
 
+    # ---- #4 用：日経VI が J-Quants 指数四本値で取れるか（N145。Phase0 必須確認） ----
+    _hr("[#4] /indices/bars/daily  (code=N145 日経VI が取得できるか)")
+    try:
+        rows = client._get("/indices/bars/daily", {"code": "N145", "from": from_date})  # noqa: SLF001
+        df = pd.DataFrame(rows)
+        print(f"件数: {len(df)}  カラム: {list(df.columns)}")
+        if len(df):
+            print("✅ N145 取得可能 → J-Quants に統一できます")
+            print(df.tail(2).to_string())
+        else:
+            print("⚠ N145 は空（取得不可の可能性）→ stooq N145.JP フォールバックを使用")
+    except Exception as exc:  # noqa: BLE001
+        print(f"⚠ N145 取得不可（{exc}）→ stooq N145.JP フォールバックを使用")
+
     # ---- #5 日経225オプション四本値 ----
     _hr(f"[#5] /derivatives/bars/daily/options/225  (date={probe_date})")
     try:

@@ -116,6 +116,8 @@ sources:
     enabled: true    # v2 APIキー方式。Secrets に JQUANTS_API_KEY（または JQUANTS_REFRESH_TOKEN）を設定
     base_url: "https://api.jquants.com/v2"
     cache_dir: "data/cache/jquants"
+    equity_index_code: "0000"   # 株式現物指数 = TOPIX（#1モメンタム・#8株式レッグ）
+    bond_etf_code: "2510"       # #8 債券レッグ＝国債ETF（NOMURA-BPI総合連動）。10年寄りに変更可
   stooq:
     nikkei_symbol: "^nkx"   # 日経225（stooq 表記）
     cache_dir: "data/cache/stooq"
