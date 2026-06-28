@@ -38,11 +38,13 @@ dimensions:
 # inverted: true の指標は正規化後に score = 100 - score（Fear寄りを反転）。
 indicators:
   - id: momentum_125dma
-    label_ja: "日経225 vs 125日線乖離率"
+    label_ja: "TOPIX vs 125日線乖離率"
     dimension: momentum
     method: percentile
     inverted: false
-    description_ja: "日経平均が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
+    # ※ J-Quants は日経225を配信しないため、株式指数は TOPIX(code 0000)を使用（Ken確認・決定A）。
+    #   日経225版は別途 stooq 等で追加予定。
+    description_ja: "TOPIX が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
 
   - id: advance_decline_25
     label_ja: "騰落レシオ（東証プライム・25日）"
@@ -95,7 +97,7 @@ indicators:
     dimension: safe_haven
     method: percentile
     inverted: false
-    description_ja: "日経225と10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
+    description_ja: "TOPIXと10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
 
 # -----------------------------------------------------------------------------
 # 出力設定

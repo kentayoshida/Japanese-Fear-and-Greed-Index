@@ -171,7 +171,8 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     # ---- #1 モメンタム（指数価格から計算）----
     try:
         close = _nikkei_close_real(config)
-        close = validate_series(close, indicator_id="nikkei_close", min_value=1000, max_value=200000,
+        # TOPIX(現状 約4000)。異常値・誤指数の検知のためレンジ検証（広めの安全域）。
+        close = validate_series(close, indicator_id="topix_close", min_value=300, max_value=20000,
                                 min_points=130)
         dev = momentum_125dma(close)
         series["momentum_125dma"] = IndicatorSeries("momentum_125dma", dev, "jquants_or_stooq")

@@ -16,7 +16,7 @@ const DIMENSION_LABELS: Record<string, string> = {
 
 // 指標ごとの一言説明（日本語オリジナル）。
 const DESCRIPTIONS: Record<string, string> = {
-  momentum_125dma: "日経平均と125日移動平均の乖離。上方乖離は強気。",
+  momentum_125dma: "TOPIXと125日移動平均の乖離。上方乖離は強気。",
   advance_decline_25: "値上がり÷値下がり銘柄数の25日累積。市場の幅。",
   new_high_low: "新高値−新安値のネット銘柄数。株価の地力。",
   nikkei_vi: "日経平均の予想変動率。高いほど不安（反転）。",
