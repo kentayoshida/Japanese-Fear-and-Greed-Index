@@ -1,0 +1,24 @@
+name: J-Quants スキーマ検証（一時）
+
+# v2 実レスポンスのカラム名（#5 オプション四本値・#7 空売り比率）を CI ログに出力するための
+# 使い捨てワークフロー。#5/#7 結線が確定したら削除してよい。秘密情報は出力しない。
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+      JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 依存関係
+        working-directory: engine
+        run: pip install -r requirements.txt
+      - name: スキーマ検証
+        working-directory: engine
+        run: python scripts/jquants_probe.py
