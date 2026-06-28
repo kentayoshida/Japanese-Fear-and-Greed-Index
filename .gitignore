@@ -1,0 +1,30 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ---- データキャッシュ（生データの日次ローカルキャッシュ。再取得可能なので追跡しない） ----
+engine/data/cache/
+
+# ---- Node / Next.js ----
+node_modules/
+web/.next/
+web/out/
+web/.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- 秘匿情報（絶対にコミットしない） ----
+.env
+.env.*
+!.env.example
+
+# ---- OS / editor ----
+.DS_Store
+*.log
+
+# ---- 配布用 git bundle（リポジトリには含めない） ----
+*.bundle

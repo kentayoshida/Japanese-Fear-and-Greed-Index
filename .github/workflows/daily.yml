@@ -1,0 +1,60 @@
+name: 日次スコア再生成
+
+# 仕様 §1-C / §6：JST 引け後＋各データの発表ラグを見て実行。
+#   - 日経225オプション四本値は翌 27:00 頃（≒翌3時 JST）更新
+#   - 松井「投資指標（店内）」は翌営業日更新
+# よって JST 06:00（= UTC 21:00）に実行する。
+on:
+  schedule:
+    - cron: "0 21 * * 0-4" # UTC 21:00 日〜木 = JST 06:00 月〜金（営業日の翌朝）
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "実行モード（real=実データ / demo=合成データ）"
+        type: choice
+        options: ["real", "demo"]
+        default: "real"
+
+concurrency:
+  group: daily-recompute
+  cancel-in-progress: false
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 生成 JSON をコミットするため
+    env:
+      TZ: Asia/Tokyo
+      # J-Quants 認証情報（GitHub Secrets で設定。コードに直書きしない §6）
+      JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
+      JQUANTS_MAIL_ADDRESS: ${{ secrets.JQUANTS_MAIL_ADDRESS }}
+      JQUANTS_PASSWORD: ${{ secrets.JQUANTS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 依存関係のインストール
+        working-directory: engine
+        run: pip install -r requirements.txt
+
+      - name: スコア再生成
+        working-directory: engine
+        run: |
+          python scripts/run_daily.py --mode "${{ github.event.inputs.mode || 'real' }}"
+
+      - name: 変更があればコミット
+        run: |
+          if [ -n "$(git status --porcelain web/public/data)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add web/public/data
+            git commit -m "chore(data): 日次スコア再生成 ($(date +%Y-%m-%d))"
+            git push
+          else
+            echo "変更なし。コミットをスキップします。"
+          fi

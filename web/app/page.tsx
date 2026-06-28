@@ -1,0 +1,108 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Gauge from "@/components/Gauge";
+import ComparisonStrip from "@/components/ComparisonStrip";
+import HistoryChart from "@/components/HistoryChart";
+import IndicatorCard from "@/components/IndicatorCard";
+import { Latest, HistoryPoint } from "@/lib/fgi";
+
+// 静的 JSON は GitHub Actions の日次 cron が再生成・コミットする。
+// クライアントから取得するため、再デプロイ後に最新値が反映される。
+async function loadJson<T>(path: string): Promise<T> {
+  const res = await fetch(path, { cache: "no-store" });
+  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+export default function Page() {
+  const [latest, setLatest] = useState<Latest | null>(null);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      loadJson<Latest>("/data/latest.json"),
+      loadJson<HistoryPoint[]>("/data/history.json"),
+    ])
+      .then(([l, h]) => {
+        setLatest(l);
+        setHistory(h);
+      })
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  if (error) {
+    return (
+      <main className="page">
+        <div className="empty-state">データを読み込めませんでした。<br />{error}</div>
+      </main>
+    );
+  }
+
+  if (!latest) {
+    return (
+      <main className="page">
+        <div className="empty-state">読み込み中…</div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page">
+      <header className="hero">
+        <div className="hero__eyebrow">日本版 Fear &amp; Greed Index</div>
+        <h1 className="hero__title">いま市場を動かしている感情は？</h1>
+        <p className="hero__sub">
+          日本株式市場の投資家心理を8つの指標から 0〜100 の単一スコアに合成しています。
+        </p>
+
+        {latest.sample && (
+          <div className="notice notice--sample">
+            ⚠ これはサンプル（合成データ）です。実データソース（J-Quants 等）を結線すると本番値に切り替わります。
+          </div>
+        )}
+
+        <Gauge score={latest.score} />
+
+        <div className="hero__meta">
+          <span>基準日 {latest.as_of}</span>
+          <span className="dot">•</span>
+          <span>
+            採用指標 {latest.coverage}/{latest.n_indicators}
+          </span>
+          <span className="dot">•</span>
+          <span>参照期間 {latest.lookback_days}営業日</span>
+        </div>
+      </header>
+
+      <section className="section">
+        <h2 className="section-title">時点比較</h2>
+        <ComparisonStrip history={history} />
+      </section>
+
+      <section className="section">
+        <HistoryChart history={history} />
+      </section>
+
+      <section className="section">
+        <h2 className="section-title">指標の内訳</h2>
+        <div className="indicator-grid">
+          {latest.components.map((c) => (
+            <IndicatorCard key={c.id} c={c} />
+          ))}
+        </div>
+      </section>
+
+      <footer className="footer">
+        <p className="disclaimer">
+          {latest.disclaimer ??
+            "本指標は情報提供目的の自作指標であり、投資助言ではありません。"}
+        </p>
+        {latest.generated_at && (
+          <p className="footer__gen">最終更新: {new Date(latest.generated_at).toLocaleString("ja-JP")}</p>
+        )}
+      </footer>
+    </main>
+  );
+}

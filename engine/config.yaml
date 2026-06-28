@@ -1,0 +1,119 @@
+# =============================================================================
+# 日本版 Fear & Greed Index — 定量設計コンフィグ
+#
+# このファイルだけで指標の採否・正規化方式・lookback・加重・アンカーを
+# 調整できる（Python ロジックを書き換えずに）。仕様 §3 / §4 / §6 に対応。
+# =============================================================================
+
+# ローリング・パーセンタイル正規化の参照期間（営業日）。
+# 252 ≒ 1年。短いほど現在レジームに敏感、長いほど安定だが鈍い。
+lookback_days: 252
+
+# 合成スコアの判定バンド（§5.1）。境界は [下限, 上限) で評価する。
+bands:
+  - { name: "Extreme Fear", label_ja: "極度の恐怖", min: 0,  max: 25 }
+  - { name: "Fear",         label_ja: "恐怖",       min: 25, max: 45 }
+  - { name: "Neutral",      label_ja: "中立",       min: 45, max: 55 }
+  - { name: "Greed",        label_ja: "貪欲",       min: 55, max: 75 }
+  - { name: "Extreme Greed", label_ja: "極度の貪欲", min: 75, max: 100 }
+
+# 6つの心理次元に均等加重（各 1/6）。次元内に複数指標がある場合はその次元の
+# 重みを指標間で均等配分する（§4.1）。重みは絶対値ではなく相対比のみ意味を持ち、
+# 採用指標で再正規化される（compose 時）。すべて上書き可能。
+#
+# 仕様の不整合（§2 の8指標 vs §4.1 の6次元）への確定対応（Ken 回答）：
+#   #5 P/Cレシオ と #7 空売り比率 を同一の「ヘッジ／ポジショニング」次元
+#   (hedge_positioning) に束ねて 6次元を維持する。結果：
+#     momentum 1/6, volatility 1/6, leverage 1/6, safe_haven 1/6,
+#     breadth の2指標 各1/12, hedge_positioning の2指標 各1/12 → 合計 1.0
+dimensions:
+  momentum:          { weight: 0.166667, label_ja: "モメンタム" }
+  breadth:           { weight: 0.166667, label_ja: "ブレッドス" }
+  volatility:        { weight: 0.166667, label_ja: "ボラティリティ" }
+  hedge_positioning: { weight: 0.166667, label_ja: "ヘッジ / ポジショニング" }
+  leverage:          { weight: 0.166667, label_ja: "レバレッジ / 個人心理" }
+  safe_haven:        { weight: 0.166667, label_ja: "安全資産選好" }
+
+# 8指標（§2）。method: percentile | anchor。
+# inverted: true の指標は正規化後に score = 100 - score（Fear寄りを反転）。
+indicators:
+  - id: momentum_125dma
+    label_ja: "日経225 vs 125日線乖離率"
+    dimension: momentum
+    method: percentile
+    inverted: false
+    description_ja: "日経平均が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
+
+  - id: advance_decline_25
+    label_ja: "騰落レシオ（東証プライム・25日）"
+    dimension: breadth
+    method: anchor
+    inverted: false
+    # ≤70:0（極度の恐怖）, 100:50, ≥130:100（過熱）
+    anchors: [[70, 0], [100, 50], [130, 100]]
+    description_ja: "値上がり銘柄数÷値下がり銘柄数の25日累積。市場の幅広い強さ/弱さを示す。"
+
+  - id: new_high_low
+    label_ja: "新高値 − 新安値（東証全体・ネット）"
+    dimension: breadth
+    method: percentile
+    inverted: false
+    description_ja: "年初来新高値銘柄数から新安値銘柄数を引いたネット値。株価の地力の強さ。"
+
+  - id: nikkei_vi
+    label_ja: "日経VI（ボラティリティ指数）"
+    dimension: volatility
+    method: percentile
+    inverted: true   # 高VI = 恐怖
+    description_ja: "日経平均の予想変動率。高いほど投資家の不安が大きい（反転）。"
+
+  - id: put_call_ratio
+    label_ja: "日経225オプション Put/Call レシオ"
+    dimension: hedge_positioning
+    method: percentile
+    inverted: true   # 高P/C = 恐怖（ヘッジ需要）
+    description_ja: "プット出来高÷コール出来高。高いほど下落ヘッジ需要が強い（反転）。"
+
+  - id: margin_pl_ratio
+    label_ja: "信用評価損益率（買い方）"
+    dimension: leverage
+    method: anchor
+    inverted: false
+    # ≤-30:0（破滅）, -20:20（強い恐怖）, -10:50, ≥0:100
+    anchors: [[-30, 0], [-20, 20], [-10, 50], [0, 100]]
+    description_ja: "信用買い建玉の含み損益率。低い（含み損が深い）ほど個人の恐怖が強い。"
+
+  - id: short_selling_ratio
+    label_ja: "空売り比率（東証）"
+    dimension: hedge_positioning   # #5 P/Cレシオと同一次元に束ねて6次元を維持（dimensions注記参照）
+    method: percentile
+    inverted: true   # 高い空売り比率 = 恐怖（反転）
+    description_ja: "売買代金に占める空売りの比率。高いほどヘッジ/弱気姿勢が強い（反転）。"
+
+  - id: safe_haven
+    label_ja: "セーフヘイブン需要（株式 − 債券 20日リターン差）"
+    dimension: safe_haven
+    method: percentile
+    inverted: false
+    description_ja: "日経225と10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
+
+# -----------------------------------------------------------------------------
+# 出力設定
+# -----------------------------------------------------------------------------
+output:
+  latest_path: "../web/public/data/latest.json"
+  history_path: "../web/public/data/history.json"
+
+# -----------------------------------------------------------------------------
+# データソース設定
+# APIキー等の秘匿情報はここに置かず、環境変数 / GitHub Secrets で渡す。
+#   JQUANTS_REFRESH_TOKEN または JQUANTS_MAIL_ADDRESS + JQUANTS_PASSWORD
+# -----------------------------------------------------------------------------
+sources:
+  jquants:
+    enabled: false   # J-Quants 契約・APIキー発行後に true へ（Phase 2）
+    base_url: "https://api.jquants.com/v1"
+    cache_dir: "data/cache/jquants"
+  stooq:
+    nikkei_symbol: "^nkx"   # 日経225（stooq 表記）
+    cache_dir: "data/cache/stooq"

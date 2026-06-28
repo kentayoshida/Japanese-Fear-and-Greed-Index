@@ -1,0 +1,96 @@
+{
+  "as_of": "2026-06-26",
+  "score": 78.2,
+  "band": "Extreme Greed",
+  "band_label_ja": "極度の貪欲",
+  "coverage": 8,
+  "n_indicators": 8,
+  "lookback_days": 252,
+  "components": [
+    {
+      "id": "momentum_125dma",
+      "label": "日経225 vs 125日線乖離率",
+      "dimension": "momentum",
+      "raw": 3.041314,
+      "score": 91.0714,
+      "weight": 0.166667,
+      "inverted": false,
+      "stale": false
+    },
+    {
+      "id": "advance_decline_25",
+      "label": "騰落レシオ（東証プライム・25日）",
+      "dimension": "breadth",
+      "raw": 122.249298,
+      "score": 87.0822,
+      "weight": 0.083333,
+      "inverted": false,
+      "stale": false
+    },
+    {
+      "id": "new_high_low",
+      "label": "新高値 − 新安値（東証全体・ネット）",
+      "dimension": "breadth",
+      "raw": 105.988119,
+      "score": 83.1349,
+      "weight": 0.083333,
+      "inverted": false,
+      "stale": false
+    },
+    {
+      "id": "nikkei_vi",
+      "label": "日経VI（ボラティリティ指数）",
+      "dimension": "volatility",
+      "raw": 17.27062,
+      "score": 91.8651,
+      "weight": 0.166667,
+      "inverted": true,
+      "stale": false
+    },
+    {
+      "id": "put_call_ratio",
+      "label": "日経225オプション Put/Call レシオ",
+      "dimension": "hedge_positioning",
+      "raw": 1.084448,
+      "score": 71.627,
+      "weight": 0.083333,
+      "inverted": true,
+      "stale": false
+    },
+    {
+      "id": "margin_pl_ratio",
+      "label": "信用評価損益率（買い方）",
+      "dimension": "leverage",
+      "raw": -0.724801,
+      "score": 96.376,
+      "weight": 0.166667,
+      "inverted": false,
+      "stale": false
+    },
+    {
+      "id": "short_selling_ratio",
+      "label": "空売り比率（東証）",
+      "dimension": "hedge_positioning",
+      "raw": 42.426711,
+      "score": 77.9762,
+      "weight": 0.083333,
+      "inverted": true,
+      "stale": false
+    },
+    {
+      "id": "safe_haven",
+      "label": "セーフヘイブン需要（株式 − 債券 20日リターン差）",
+      "dimension": "safe_haven",
+      "raw": -6.822799,
+      "score": 29.9603,
+      "weight": 0.166667,
+      "inverted": false,
+      "stale": false
+    }
+  ],
+  "history_ref": "history.json",
+  "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
+  "generated_at": "2026-06-28T05:02:52.324677+00:00",
+  "mode": "demo",
+  "sample": true
+}

@@ -1,0 +1,163 @@
+:root {
+  --bg: #0b0d12;
+  --panel: #141821;
+  --panel-2: #1b212d;
+  --border: #262d3a;
+  --text: #f5f6f8;
+  --muted: #9aa0a6;
+
+  --zone-extreme-fear: #c0392b;
+  --zone-fear: #e07b1f;
+  --zone-neutral: #d8b400;
+  --zone-greed: #70bb50;
+  --zone-extreme-greed: #1a9850;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Segoe UI", Meiryo, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+/* ---------- Hero ---------- */
+.hero { text-align: center; padding: 16px 0 8px; }
+.hero__eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.hero__title {
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 800;
+  margin: 10px 0 8px;
+  line-height: 1.2;
+}
+.hero__sub { color: var(--muted); margin: 0 auto; max-width: 540px; font-size: 15px; }
+.hero__meta {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  color: var(--muted); font-size: 13px; margin-top: 6px;
+}
+.hero__meta .dot { opacity: 0.5; }
+
+.notice {
+  margin: 14px auto; max-width: 620px; padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; line-height: 1.5;
+}
+.notice--sample { background: rgba(216, 180, 0, 0.12); border: 1px solid var(--zone-neutral); color: #f0d97a; }
+
+/* ---------- Gauge ---------- */
+.gauge { max-width: 480px; margin: 8px auto 0; }
+.gauge svg { width: 100%; height: auto; display: block; }
+.needle { transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* ---------- Sections ---------- */
+.section { margin-top: 48px; }
+.section-title {
+  font-size: 18px; font-weight: 700; margin: 0 0 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-title::before {
+  content: ""; width: 4px; height: 18px; border-radius: 2px; background: var(--zone-greed);
+}
+
+/* ---------- Comparison strip ---------- */
+.compare-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+}
+.compare-item {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 10px; text-align: center;
+}
+.compare-label { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.compare-dot {
+  width: 56px; height: 56px; border-radius: 50%; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 22px; color: #0b0d12;
+  font-variant-numeric: tabular-nums;
+}
+.compare-dot--empty { background: var(--panel-2); color: var(--muted); }
+.compare-zone { margin-top: 8px; font-size: 12px; font-weight: 700; }
+.compare-zone--empty { color: var(--muted); font-weight: 500; }
+
+/* ---------- History chart ---------- */
+.history__header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 8px;
+}
+.history__header .section-title { margin: 0; }
+.range-toggle { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+.range-btn {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+}
+.range-btn:hover { color: var(--text); }
+.range-btn.is-active { background: var(--panel-2); color: var(--text); }
+.history__chart {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px 8px; margin-top: 12px;
+}
+.chart-tooltip {
+  background: #0b0d12; border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 12px;
+}
+.chart-tooltip__date { color: var(--muted); }
+.chart-tooltip__score { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Indicator cards ---------- */
+.indicator-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+}
+.indicator-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px;
+}
+.indicator-card.is-stale { opacity: 0.7; }
+.indicator-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.indicator-card__dim { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.indicator-card__label { font-size: 15px; font-weight: 700; margin: 4px 0 0; line-height: 1.35; }
+.indicator-card__score { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.indicator-card__score .muted { color: var(--muted); }
+
+.minibar { margin: 14px 0 10px; }
+.minibar__track { position: relative; height: 10px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
+.minibar__zone { position: absolute; top: 0; bottom: 0; }
+.minibar__marker {
+  position: absolute; top: -3px; width: 3px; height: 16px; border-radius: 2px;
+  background: var(--text); transform: translateX(-50%);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5);
+}
+
+.indicator-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; color: var(--muted); }
+.badge { border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; font-weight: 700; font-size: 11px; }
+.badge--stale { color: var(--zone-fear); border-color: var(--zone-fear); }
+.indicator-card__raw, .indicator-card__weight { font-variant-numeric: tabular-nums; }
+.indicator-card__desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
+
+/* ---------- Footer / states ---------- */
+.footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; }
+.disclaimer { color: var(--muted); font-size: 12px; }
+.footer__gen { color: var(--muted); font-size: 11px; opacity: 0.7; }
+.empty-state { text-align: center; color: var(--muted); padding: 120px 0; line-height: 1.8; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+  .compare-strip { grid-template-columns: repeat(2, 1fr); }
+  .indicator-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .needle { transition: none; }
+}

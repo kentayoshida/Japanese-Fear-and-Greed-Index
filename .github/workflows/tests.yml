@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: 依存関係
+        working-directory: engine
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: pytest
+        working-directory: engine
+        run: PYTHONPATH=. pytest -q
+      - name: demo パイプラインの疎通確認
+        working-directory: engine
+        run: python scripts/run_daily.py --mode demo
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: インストール
+        working-directory: web
+        run: npm install
+      - name: ビルド
+        working-directory: web
+        run: npm run build
