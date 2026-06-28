@@ -119,5 +119,6 @@ sources:
     equity_index_code: "0000"   # 株式現物指数 = TOPIX（#1モメンタム・#8株式レッグ）
     bond_etf_code: "2510"       # #8 債券レッグ＝国債ETF（NOMURA-BPI総合連動）。10年寄りに変更可
   stooq:
-    nikkei_symbol: "^nkx"   # 日経225（stooq 表記）
+    nikkei_symbol: "^nkx"        # 日経225（stooq 表記。日経225版で使用）
+    nikkei_vi_symbol: "n145.jp"  # 日経VI（#4。J-Quantsは N145 非配信のため stooq を使用）
     cache_dir: "data/cache/stooq"

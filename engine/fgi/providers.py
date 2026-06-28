@@ -162,6 +162,38 @@ def _provide_short_ratio(config: Config, client, series: dict, errors: dict) -> 
         errors["short_selling_ratio"] = f"short_selling_ratio: {exc}"
 
 
+def _stooq_close(symbol: str) -> pd.Series:
+    """stooq の日次CSVから終値系列を取得する（CIのオープンネットワークで実行）。"""
+    import requests
+    from io import StringIO
+
+    url = f"https://stooq.com/q/d/l/?s={symbol}&i=d"
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    df = pd.read_csv(StringIO(resp.text))
+    if "Close" not in df.columns or "Date" not in df.columns:
+        raise FetchError(f"stooq({symbol}): unexpected columns {list(df.columns)}")
+    return pd.Series(
+        pd.to_numeric(df["Close"], errors="coerce").values, index=pd.to_datetime(df["Date"])
+    ).dropna().sort_index()
+
+
+def _provide_nikkei_vi(config: Config, series: dict, errors: dict) -> None:
+    """#4 日経VI：J-Quants は N145 を配信しないため stooq（N145.JP）から取得（Ken決定）。
+
+    将来 J-Quants が N145 を配信したら index_close(code='N145') へ切替可。yfinance は使わない。
+    """
+    try:
+        symbol = config.sources.get("stooq", {}).get("nikkei_vi_symbol", "n145.jp")
+        s = _stooq_close(symbol)
+        s = validate_series(s, indicator_id="nikkei_vi", min_value=5, max_value=200, min_points=60)
+        series["nikkei_vi"] = IndicatorSeries("nikkei_vi", s, "stooq")
+    except FetchError as exc:
+        errors["nikkei_vi"] = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        errors["nikkei_vi"] = f"nikkei_vi(stooq): {exc}"
+
+
 def _provide_safe_haven(config: Config, client, series: dict, errors: dict) -> None:
     """#8 セーフヘイブン：株式(TOPIX) − 債券(国債ETF調整後終値) の20日リターン差。"""
     from datetime import datetime, timedelta
@@ -203,6 +235,9 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     except FetchError as exc:
         errors["momentum_125dma"] = str(exc)
 
+    # ---- #4 日経VI（stooq N145.JP。J-Quants非配信のため）----
+    _provide_nikkei_vi(config, series, errors)
+
     # ---- #5 P/Cレシオ・#7 空売り比率（J-Quants v2 一次データ）----
     if JQuantsClient.is_configured():
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
@@ -217,7 +252,6 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     pending = {
         "advance_decline_25": "東証プライム 騰落（J-Quants 全銘柄四本値から自前集計予定）",
         "new_high_low": "東証全体 新高値/新安値（J-Quants 全銘柄四本値から自前集計予定）",
-        "nikkei_vi": "日経VI（N145 を J-Quants で確認→不可なら stooq N145.JP）",
         "margin_pl_ratio": "松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み）",
     }
     for ind_id, reason in pending.items():
