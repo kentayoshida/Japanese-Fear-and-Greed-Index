@@ -97,8 +97,48 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"取得失敗: {exc}")
 
+    # ---- #8 用：国債ETF（例 2510）の四本値（調整後終値＝トータルリターン近似） ----
+    bond_etf = os.environ.get("JQUANTS_BOND_ETF", "2510")
+    _hr(f"[#8] /equities/bars/daily  (code={bond_etf} 国債ETF, from={from_date})")
+    try:
+        rows = client._get("/equities/bars/daily", {"code": bond_etf, "from": from_date})  # noqa: SLF001
+        df = pd.DataFrame(rows)
+        print(f"件数: {len(df)}  カラム: {list(df.columns)}")
+        if len(df):
+            print(df.tail(2).to_string())
+    except Exception as exc:  # noqa: BLE001
+        print(f"取得失敗: {exc}")
+
+    # ---- #2/#3 用：全銘柄四本値（1日）のスキーマ・件数（騰落/新高値新安値の集計可否） ----
+    _hr(f"[#2/#3] /equities/bars/daily  (date={probe_date}, 全銘柄)")
+    try:
+        rows = client._get("/equities/bars/daily", {"date": probe_date})  # noqa: SLF001
+        df = pd.DataFrame(rows)
+        print(f"件数: {len(df)}  カラム: {list(df.columns)}")
+        if len(df):
+            print("先頭1行:")
+            print(df.head(1).to_string())
+    except Exception as exc:  # noqa: BLE001
+        print(f"取得失敗: {exc}")
+
+    # ---- #2 用：上場銘柄一覧（市場区分＝プライム判定に使う） ----
+    _hr("[#2] /equities/master  (上場銘柄一覧・市場区分)")
+    try:
+        rows = client._get("/equities/master", {})  # noqa: SLF001
+        df = pd.DataFrame(rows)
+        print(f"件数: {len(df)}  カラム: {list(df.columns)}")
+        if len(df):
+            print("先頭1行:")
+            print(df.head(1).to_string())
+            # 市場区分らしきカラムのユニーク値
+            for c in df.columns:
+                if "market" in c.lower() or "segment" in c.lower() or "区分" in c:
+                    print(f"  {c} のユニーク値(先頭): {df[c].astype(str).unique()[:10]}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"取得失敗: {exc}")
+
     _hr("完了")
-    print("上記のカラム名・サンプル行をそのまま共有してください。#5/#7 を確定します。")
+    print("上記のカラム名・サンプル行をそのまま共有してください。#8/#2/#3 を確定します。")
     return 0
 
 
