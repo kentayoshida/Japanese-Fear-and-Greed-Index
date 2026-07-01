@@ -152,8 +152,45 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"取得失敗: {exc}")
 
+    # ---- #6案A用：週次信用取引残高エンドポイントの特定（v2パス不明のため候補総当り） ----
+    _hr("[#6案A] 週次信用取引残高エンドポイントの探索（候補パスを順に試行）")
+    candidates = [
+        "/markets/weekly-margin-interest",
+        "/markets/weekly_margin_interest",
+        "/markets/margin/weekly",
+        "/markets/weekly-margin",
+        "/markets/margin-interest",
+        "/markets/credit/weekly",
+        "/markets/margin",
+    ]
+    hit = None
+    for path in candidates:
+        try:
+            rows = client._get(path, {"from": from_date})  # noqa: SLF001
+            print(f"  試行 {path} → 件数 {len(rows)}")
+            if rows and hit is None:
+                hit = (path, rows)
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc).splitlines()[0][:90]
+            print(f"  試行 {path} → NG ({msg})")
+    if hit:
+        path, rows = hit
+        df = pd.DataFrame(rows)
+        print(f"\n  ★ 当たり: {path}")
+        print(f"  件数: {len(df)}  カラム: {list(df.columns)}")
+        print("  先頭1行:")
+        print(df.head(1).to_string())
+        # 集計対象らしきカラム（買い残/売り残・数量/金額）を推定表示
+        for c in df.columns:
+            lc = c.lower()
+            if any(k in lc for k in ("long", "short", "buy", "sell", "margin", "date", "code", "issue")):
+                uv = df[c].astype(str).unique()[:4]
+                print(f"    候補カラム {c}: {uv}")
+    else:
+        print("\n  ⚠ 週次信用残エンドポイントを特定できず。パス候補の追加が必要。")
+
     _hr("完了")
-    print("上記のカラム名・サンプル行をそのまま共有してください。#8/#2/#3 を確定します。")
+    print("上記のカラム名・サンプル行をそのまま共有してください。")
     return 0
 
 
