@@ -43,6 +43,10 @@ jobs:
         working-directory: engine
         run: pip install -r requirements.txt
 
+      - name: Playwright（#6 松井のヘッドレス描画用）
+        working-directory: engine
+        run: python -m playwright install --with-deps chromium
+
       - name: スコア再生成
         working-directory: engine
         run: |

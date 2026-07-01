@@ -324,6 +324,28 @@ def _provide_advance_decline(config: Config, client, series: dict, errors: dict)
         errors["advance_decline_25"] = f"advance_decline_25: {exc}"
 
 
+def _provide_margin_pl(config: Config, series: dict, errors: dict) -> None:
+    """#6 信用評価損益率（買い方）：松井『投資指標(店内)』を Playwright で取得し、
+    日次値を CSV に蓄積（前営業日値・anchor 正規化のため最新値が主眼）。"""
+    from datetime import datetime, timedelta
+
+    try:
+        from .fetchers.matsui import fetch_margin_pl_buy
+
+        value = fetch_margin_pl_buy()
+        as_of = pd.Timestamp((datetime.utcnow() + timedelta(hours=9)).date())
+        path = _series_cache_path(config, "margin_pl_ratio")
+        cached = _load_series_cache(path)
+        merged = pd.concat([cached, pd.Series({as_of: float(value)})]).sort_index()
+        merged = merged[~merged.index.duplicated(keep="last")]
+        _save_series_cache(path, merged)
+        series["margin_pl_ratio"] = IndicatorSeries("margin_pl_ratio", merged, "matsui")
+    except FetchError as exc:
+        errors["margin_pl_ratio"] = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        errors["margin_pl_ratio"] = f"margin_pl_ratio: {exc}"
+
+
 def _provide_new_high_low(config: Config, client, series: dict, errors: dict) -> None:
     """#3 新高値 − 新安値（東証全体・ネット）：全銘柄 AdjC の52週(252営業日)高安から
     新高値/新安値銘柄数を数えネット値を算出。全銘柄終値を gzip CSV に増分キャッシュし
@@ -418,12 +440,8 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
                   "advance_decline_25", "new_high_low"):
             errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
-    # ---- #6 未結線：要ソース確認（松井 API/構造の特定待ち）----
-    pending = {
-        "margin_pl_ratio": "松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み・結線作業中）",
-    }
-    for ind_id, reason in pending.items():
-        errors[ind_id] = f"要確認: {reason}"
+    # ---- #6 信用評価損益率（松井・Playwright。J-Quants 非依存）----
+    _provide_margin_pl(config, series, errors)
 
     if errors:
         _provide_real.last_errors = errors  # type: ignore[attr-defined]
