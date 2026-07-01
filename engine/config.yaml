@@ -120,5 +120,8 @@ sources:
     bond_etf_code: "2510"       # #8 債券レッグ＝国債ETF（NOMURA-BPI総合連動）。10年寄りに変更可
   stooq:
     nikkei_symbol: "^nkx"        # 日経225（stooq 表記。日経225版で使用）
-    nikkei_vi_symbol: "n145.jp"  # 日経VI（#4。J-Quantsは N145 非配信のため stooq を使用）
     cache_dir: "data/cache/stooq"
+  nikkei_vi:
+    # #4 日経VI（J-Quants は N145 非配信、stooq にも該当なし）。日経公式の日次CSVを使用。
+    csv_url: "https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv"
+    encoding: "cp932"

@@ -178,20 +178,62 @@ def _stooq_close(symbol: str) -> pd.Series:
     ).dropna().sort_index()
 
 
-def _provide_nikkei_vi(config: Config, series: dict, errors: dict) -> None:
-    """#4 日経VI：J-Quants は N145 を配信しないため stooq（N145.JP）から取得（Ken決定）。
+def _nikkei_vi_official_csv(url: str, encoding: str = "cp932") -> pd.Series:
+    """日経公式の日経VI日次CSV（Shift_JIS）を取得して終値系列を返す。
 
-    将来 J-Quants が N145 を配信したら index_close(code='N145') へ切替可。yfinance は使わない。
+    先頭のタイトル行・末尾の注記行が混在するため、日付として解釈できる行だけを拾い、
+    ヘッダから『終値』列位置を特定してパースする（列順の揺れに頑健化）。
     """
+    import requests
+
+    resp = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0 (fgi)"})
+    resp.raise_for_status()
+    text = resp.content.decode(encoding, errors="replace")
+
+    close_idx = 1  # 既定：日付の次を終値とみなす（日経指数CSVの標準）
+    header_found = False
+    dates: list = []
+    values: list = []
+    for line in text.splitlines():
+        parts = [p.strip().strip('"') for p in line.split(",")]
+        if not header_found:
+            if any(("データ日付" in p) or (p == "日付") for p in parts):
+                for i, p in enumerate(parts):
+                    if "終値" in p:
+                        close_idx = i
+                header_found = True
+            continue
+        if len(parts) <= close_idx:
+            continue
+        try:
+            d = pd.to_datetime(parts[0])
+        except Exception:  # noqa: BLE001
+            continue
+        try:
+            v = float(parts[close_idx].replace(",", ""))
+        except Exception:  # noqa: BLE001
+            continue
+        dates.append(d)
+        values.append(v)
+    if not values:
+        raise FetchError(f"nikkei_vi(official csv): 行を解釈できず url={url}")
+    return pd.Series(values, index=pd.DatetimeIndex(dates)).sort_index()
+
+
+def _provide_nikkei_vi(config: Config, series: dict, errors: dict) -> None:
+    """#4 日経VI：J-Quants/stooq に無いため日経公式の日次CSVを使用（Ken決定）。yfinance不使用。"""
     try:
-        symbol = config.sources.get("stooq", {}).get("nikkei_vi_symbol", "n145.jp")
-        s = _stooq_close(symbol)
+        cfg = config.sources.get("nikkei_vi", {})
+        url = cfg.get("csv_url")
+        if not url:
+            raise FetchError("nikkei_vi: config の csv_url 未設定")
+        s = _nikkei_vi_official_csv(url, cfg.get("encoding", "cp932"))
         s = validate_series(s, indicator_id="nikkei_vi", min_value=5, max_value=200, min_points=60)
-        series["nikkei_vi"] = IndicatorSeries("nikkei_vi", s, "stooq")
+        series["nikkei_vi"] = IndicatorSeries("nikkei_vi", s, "nikkei_official")
     except FetchError as exc:
         errors["nikkei_vi"] = str(exc)
     except Exception as exc:  # noqa: BLE001
-        errors["nikkei_vi"] = f"nikkei_vi(stooq): {exc}"
+        errors["nikkei_vi"] = f"nikkei_vi(official): {exc}"
 
 
 def _provide_safe_haven(config: Config, client, series: dict, errors: dict) -> None:
@@ -282,6 +324,67 @@ def _provide_advance_decline(config: Config, client, series: dict, errors: dict)
         errors["advance_decline_25"] = f"advance_decline_25: {exc}"
 
 
+def _provide_new_high_low(config: Config, client, series: dict, errors: dict) -> None:
+    """#3 新高値 − 新安値（東証全体・ネット）：全銘柄 AdjC の52週(252営業日)高安から
+    新高値/新安値銘柄数を数えネット値を算出。全銘柄終値を gzip CSV に増分キャッシュし
+    （web/public/data/series/stock_closes.csv.gz）、1実行あたり一定日数ずつ積み増す。"""
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    try:
+        engine_root = Path(__file__).resolve().parents[1]
+        base = (engine_root / config.output.get("latest_path", "../web/public/data/latest.json")).resolve().parent / "series"
+        base.mkdir(parents=True, exist_ok=True)
+        closes_path = base / "stock_closes.csv.gz"
+
+        if closes_path.exists():
+            cache = pd.read_csv(closes_path, compression="gzip")
+            cache["date"] = pd.to_datetime(cache["date"])
+        else:
+            cache = pd.DataFrame(columns=["date", "code", "adjc"])
+
+        jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
+        # 52週窓のネット系列を lookback ぶん得るには概ね 2*lookback 営業日が必要
+        window_days = int(config.lookback_days * 2 * 1.5) + 30
+        start = jst_today - timedelta(days=window_days)
+        target = pd.bdate_range(start=start, end=jst_today)
+        have = set(pd.to_datetime(cache["date"]).dt.normalize().unique()) if len(cache) else set()
+        missing = [d for d in target if d.normalize() not in have]
+        max_new = int(os.environ.get("JQUANTS_NHL_MAX_FETCH", "30"))
+        new_frames = []
+        for d in missing[-max_new:]:
+            closes = client.equities_close_by_date(d.strftime("%Y-%m-%d"))
+            if len(closes) == 0:
+                continue
+            new_frames.append(pd.DataFrame({
+                "date": pd.Timestamp(d.date()), "code": closes.index.astype(str),
+                "adjc": closes.values.round(2),
+            }))
+        if new_frames:
+            cache = pd.concat([cache] + new_frames, ignore_index=True)
+            cache = cache[pd.to_datetime(cache["date"]) >= pd.Timestamp(start)]
+            cache = cache.drop_duplicates(subset=["date", "code"], keep="last")
+            cache.to_csv(closes_path, index=False, compression="gzip")
+
+        if len(cache) == 0:
+            raise FetchError("new_high_low: 終値キャッシュ空（初回は数回の実行で積み増し）")
+
+        piv = cache.pivot_table(index="date", columns="code", values="adjc").sort_index()
+        win = 252
+        roll_max = piv.rolling(win, min_periods=win).max()
+        roll_min = piv.rolling(win, min_periods=win).min()
+        new_high = (piv >= roll_max) & roll_max.notna()
+        new_low = (piv <= roll_min) & roll_min.notna()
+        net = (new_high.sum(axis=1) - new_low.sum(axis=1))[roll_max.notna().any(axis=1)]
+        if len(net) == 0:
+            raise FetchError("new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）")
+        series["new_high_low"] = IndicatorSeries("new_high_low", net.astype(float), "jquants_v2")
+    except FetchError as exc:
+        errors["new_high_low"] = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        errors["new_high_low"] = f"new_high_low: {exc}"
+
+
 def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     from .fetchers.jquants import JQuantsClient
 
@@ -309,14 +412,15 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
         _provide_short_ratio(config, client, series, errors)
         _provide_safe_haven(config, client, series, errors)
         _provide_advance_decline(config, client, series, errors)
+        _provide_new_high_low(config, client, series, errors)
     else:
-        for k in ("put_call_ratio", "short_selling_ratio", "safe_haven", "advance_decline_25"):
+        for k in ("put_call_ratio", "short_selling_ratio", "safe_haven",
+                  "advance_decline_25", "new_high_low"):
             errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
-    # ---- #3/#6 未結線：要ソース確認 ----
+    # ---- #6 未結線：要ソース確認（松井 API/構造の特定待ち）----
     pending = {
-        "new_high_low": "東証全体 新高値/新安値（J-Quants 全銘柄四本値から自前集計予定）",
-        "margin_pl_ratio": "松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み）",
+        "margin_pl_ratio": "松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み・結線作業中）",
     }
     for ind_id, reason in pending.items():
         errors[ind_id] = f"要確認: {reason}"
