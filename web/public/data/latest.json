@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-06-26",
-  "score": 19.4,
-  "band": "Extreme Fear",
-  "band_label_ja": "極度の恐怖",
+  "as_of": "2026-06-30",
+  "score": 30.6,
+  "band": "Fear",
+  "band_label_ja": "恐怖",
   "coverage": 4,
   "n_indicators": 8,
   "lookback_days": 252,
@@ -11,8 +11,8 @@
       "id": "momentum_125dma",
       "label": "TOPIX vs 125日線乖離率",
       "dimension": "momentum",
-      "raw": 6.093479,
-      "score": 22.0238,
+      "raw": 6.66267,
+      "score": 25.1984,
       "weight": 0.333333,
       "inverted": false,
       "stale": false
@@ -51,8 +51,8 @@
       "id": "put_call_ratio",
       "label": "日経225オプション Put/Call レシオ",
       "dimension": "hedge_positioning",
-      "raw": 2.048804,
-      "score": 16.1972,
+      "raw": 2.422878,
+      "score": 6.3107,
       "weight": 0.166667,
       "inverted": true,
       "stale": false
@@ -71,8 +71,8 @@
       "id": "short_selling_ratio",
       "label": "空売り比率（東証）",
       "dimension": "hedge_positioning",
-      "raw": 39.292468,
-      "score": 39.881,
+      "raw": 35.915104,
+      "score": 87.8968,
       "weight": 0.166667,
       "inverted": true,
       "stale": false
@@ -81,8 +81,8 @@
       "id": "safe_haven",
       "label": "セーフヘイブン需要（株式 − 債券 20日リターン差）",
       "dimension": "safe_haven",
-      "raw": -0.758172,
-      "score": 8.1349,
+      "raw": 1.318802,
+      "score": 19.6429,
       "weight": 0.333333,
       "inverted": false,
       "stale": false
@@ -90,11 +90,11 @@
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-06-28T15:55:59.705434+00:00",
+  "generated_at": "2026-07-01T05:56:03.572760+00:00",
   "mode": "real",
   "fetch_errors": {
     "nikkei_vi": "nikkei_vi(stooq): 404 Client Error: Not Found for url: https://stooq.com/q/d/l/?s=n145.jp&i=d",
-    "advance_decline_25": "要確認: 東証プライム 騰落（J-Quants 全銘柄四本値から自前集計予定）",
+    "advance_decline_25": "advance_decline: 25日ぶんの蓄積待ち",
     "new_high_low": "要確認: 東証全体 新高値/新安値（J-Quants 全銘柄四本値から自前集計予定）",
     "margin_pl_ratio": "要確認: 松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み）"
   }
