@@ -52,7 +52,7 @@
       "label": "日経225オプション Put/Call レシオ",
       "dimension": "hedge_positioning",
       "raw": 2.422878,
-      "score": 8.0153,
+      "score": 7.9114,
       "weight": 0.125,
       "inverted": true,
       "stale": false
@@ -90,11 +90,11 @@
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-07-01T06:25:36.911993+00:00",
+  "generated_at": "2026-07-01T06:37:15.499071+00:00",
   "mode": "real",
   "fetch_errors": {
     "advance_decline_25": "advance_decline: 25日ぶんの蓄積待ち",
     "new_high_low": "new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）",
-    "margin_pl_ratio": "要確認: 松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み・結線作業中）"
+    "margin_pl_ratio": "margin_pl_ratio: Page.goto: Timeout 60000ms exceeded.\nCall log:\n  - navigating to \"https://www.matsui.co.jp/market/stock/netstock-info/\", waiting until \"networkidle\"\n"
   }
 }
