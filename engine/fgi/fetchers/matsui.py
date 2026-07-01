@@ -31,9 +31,11 @@ def fetch_margin_pl_buy(timeout_ms: int = 60000) -> float:
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                 "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
             ))
-            page.goto(URL, wait_until="networkidle", timeout=timeout_ms)
+            # ※ 松井ページは分析タグが常時通信し networkidle に到達しないため使わない。
+            #   DOM 構築後にテーブル行の出現を明示的に待つ。
+            page.goto(URL, wait_until="domcontentloaded", timeout=timeout_ms)
             # 「買い残」を含む行（信用残速報テーブル）が描画されるまで待つ
-            page.wait_for_selector("tr:has-text('買い残')", timeout=30000)
+            page.wait_for_selector("tr:has-text('買い残')", timeout=45000)
             row = page.locator("tr", has_text="買い残").first
             # 買い残行の td: [0]=信用残(億円), [1]=評価損益率(%)
             text = row.locator("td").nth(1).inner_text()
