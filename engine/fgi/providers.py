@@ -218,6 +218,70 @@ def _provide_safe_haven(config: Config, client, series: dict, errors: dict) -> N
         errors["safe_haven"] = f"safe_haven: {exc}"
 
 
+def _provide_advance_decline(config: Config, client, series: dict, errors: dict) -> None:
+    """#2 騰落レシオ（東証プライム・25日）：全銘柄 AdjC の前日比で日次の値上がり/値下がり
+    銘柄数を集計し、25日累積で騰落レシオを算出。日次 adv/dec を CSV に増分キャッシュ。"""
+    from datetime import datetime, timedelta
+
+    from .fetchers.derive import advance_decline_ratio
+
+    try:
+        path = _series_cache_path(config, "advance_decline")
+        # 既存キャッシュ（date, adv, dec）
+        if path.exists():
+            cdf = pd.read_csv(path)
+            cdf["date"] = pd.to_datetime(cdf["date"])
+            cache = cdf.set_index("date")[["adv", "dec"]].sort_index()
+        else:
+            cache = pd.DataFrame(columns=["adv", "dec"], dtype="float64")
+
+        jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
+        start = jst_today - timedelta(days=int(config.lookback_days * 1.6) + 40)
+        target = pd.bdate_range(start=start, end=jst_today)
+        have = {d.normalize() for d in cache.index}
+        missing = [d for d in target if d.normalize() not in have]
+        max_new = int(os.environ.get("JQUANTS_AD_MAX_FETCH", "25"))
+        # 前日比のため、対象バッチ＋その1営業日前から連続取得する
+        batch = missing[-max_new:]
+        if batch:
+            prime = client.listed_codes_by_market("プライム")
+            fetch_dates = list(pd.bdate_range(end=batch[-1], periods=len(batch) + 1))
+            fetch_dates = [d for d in fetch_dates if d >= (batch[0] - pd.Timedelta(days=7))]
+            prev_close = None
+            new_rows = {}
+            for d in fetch_dates:
+                closes = client.equities_close_by_date(d.strftime("%Y-%m-%d"))
+                if len(closes) == 0:
+                    continue  # 休場日
+                closes = closes[closes.index.isin(prime)]
+                if prev_close is not None and d.normalize() in {b.normalize() for b in batch}:
+                    common = closes.index.intersection(prev_close.index)
+                    diff = closes[common] - prev_close[common]
+                    new_rows[pd.Timestamp(d.date())] = {
+                        "adv": float((diff > 0).sum()),
+                        "dec": float((diff < 0).sum()),
+                    }
+                prev_close = closes
+            if new_rows:
+                add = pd.DataFrame.from_dict(new_rows, orient="index")
+                cache = pd.concat([cache, add]).sort_index()
+                cache = cache[~cache.index.duplicated(keep="last")]
+                out = cache.copy()
+                out.insert(0, "date", pd.DatetimeIndex(out.index).strftime("%Y-%m-%d"))
+                out.to_csv(path, index=False)
+
+        if len(cache) == 0:
+            raise FetchError("advance_decline: データ未取得（初回は数回の実行で積み増し）")
+        ratio = advance_decline_ratio(cache["adv"], cache["dec"], window=25)
+        if len(ratio) == 0:
+            raise FetchError("advance_decline: 25日ぶんの蓄積待ち")
+        series["advance_decline_25"] = IndicatorSeries("advance_decline_25", ratio, "jquants_v2")
+    except FetchError as exc:
+        errors["advance_decline_25"] = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        errors["advance_decline_25"] = f"advance_decline_25: {exc}"
+
+
 def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     from .fetchers.jquants import JQuantsClient
 
@@ -244,13 +308,13 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
         _provide_put_call(config, client, series, errors)
         _provide_short_ratio(config, client, series, errors)
         _provide_safe_haven(config, client, series, errors)
+        _provide_advance_decline(config, client, series, errors)
     else:
-        for k in ("put_call_ratio", "short_selling_ratio", "safe_haven"):
+        for k in ("put_call_ratio", "short_selling_ratio", "safe_haven", "advance_decline_25"):
             errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
-    # ---- #2/#3/#4/#6 未結線：要ソース確認 ----
+    # ---- #3/#6 未結線：要ソース確認 ----
     pending = {
-        "advance_decline_25": "東証プライム 騰落（J-Quants 全銘柄四本値から自前集計予定）",
         "new_high_low": "東証全体 新高値/新安値（J-Quants 全銘柄四本値から自前集計予定）",
         "margin_pl_ratio": "松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み）",
     }

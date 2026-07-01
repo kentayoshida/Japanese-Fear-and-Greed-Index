@@ -22,3 +22,6 @@ jobs:
       - name: スキーマ検証
         working-directory: engine
         run: python scripts/jquants_probe.py
+      - name: 松井ページ構造確認（#6）
+        working-directory: engine
+        run: python scripts/matsui_probe.py || true

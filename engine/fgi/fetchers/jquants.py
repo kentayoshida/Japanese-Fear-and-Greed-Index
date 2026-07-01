@@ -118,6 +118,33 @@ class JQuantsClient:
         ).dropna().sort_index()
         return s
 
+    def listed_codes_by_market(self, market_name: str | None = None) -> set[str]:
+        """上場銘柄コード集合。market_name（例 'プライム'）指定でその市場区分に限定。"""
+        rows = self._get("/equities/master", {})
+        if not rows:
+            raise JQuantsError("listed_codes_by_market: no data")
+        df = pd.DataFrame(rows)
+        code_col = self._find_col(df.columns, "Code")
+        if market_name:
+            mkt_col = self._find_col(df.columns, "MktNm", "MarketName")
+            if not mkt_col:
+                raise JQuantsError(f"master: 市場名列が無い columns={list(df.columns)}")
+            df = df[df[mkt_col].astype(str) == market_name]
+        return set(df[code_col].astype(str))
+
+    def equities_close_by_date(self, date: str) -> pd.Series:
+        """指定日の全銘柄の調整後終値（index=銘柄コード）。#2/#3 の集計素材。"""
+        rows = self._get("/equities/bars/daily", {"date": date})
+        if not rows:
+            return pd.Series(dtype="float64")  # 休場日など
+        df = pd.DataFrame(rows)
+        code_col = self._find_col(df.columns, "Code")
+        close_col = self._find_col(df.columns, "AdjC", "AdjustmentClose", "Close", "C")
+        s = pd.Series(
+            pd.to_numeric(df[close_col], errors="coerce").values, index=df[code_col].astype(str)
+        ).dropna()
+        return s
+
     def equity_adj_close(self, code: str, from_date: str | None = None,
                          to_date: str | None = None) -> pd.Series:
         """個別銘柄/ETF の調整後終値（AdjC）系列。#8 の債券レッグ（国債ETF）等に使う。
