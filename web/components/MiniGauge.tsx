@@ -48,11 +48,11 @@ export default function MiniGauge({ score }: { score: number | null }) {
       ))}
       {has && (
         <>
-          <line x1={CX} y1={CY} x2={tip.x} y2={tip.y} stroke="#f5f6f8" strokeWidth={2.5} strokeLinecap="round" />
-          <circle cx={CX} cy={CY} r={4} fill="#f5f6f8" />
+          <line x1={CX} y1={CY} x2={tip.x} y2={tip.y} stroke="#1a1d21" strokeWidth={2.5} strokeLinecap="round" />
+          <circle cx={CX} cy={CY} r={4} fill="#1a1d21" />
         </>
       )}
-      <text x={CX} y={CY - 12} textAnchor="middle" fontSize={20} fontWeight={800} fill="#f5f6f8" style={{ fontVariantNumeric: "tabular-nums" }}>
+      <text x={CX} y={CY - 12} textAnchor="middle" fontSize={20} fontWeight={800} fill="#1a1d21" style={{ fontVariantNumeric: "tabular-nums" }}>
         {has ? Math.round(v) : "—"}
       </text>
     </svg>

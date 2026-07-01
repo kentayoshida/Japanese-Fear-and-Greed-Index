@@ -1,10 +1,13 @@
 :root {
-  --bg: #0b0d12;
-  --panel: #141821;
-  --panel-2: #1b212d;
-  --border: #262d3a;
-  --text: #f5f6f8;
-  --muted: #9aa0a6;
+  /* CNN 本家準拠のライトテーマ（白背景） */
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f1f3f6;
+  --border: #e2e5ea;
+  --text: #1a1d21;
+  --muted: #6b7280;
+  --ink: #1a1d21;        /* ゲージ針・数値などの濃色 */
+  --card-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
 
   --zone-extreme-fear: #c0392b;
   --zone-fear: #e07b1f;
@@ -57,7 +60,7 @@ html, body {
   margin: 14px auto; max-width: 620px; padding: 10px 14px; border-radius: 10px;
   font-size: 13px; line-height: 1.5;
 }
-.notice--sample { background: rgba(216, 180, 0, 0.12); border: 1px solid var(--zone-neutral); color: #f0d97a; }
+.notice--sample { background: #fdf6e3; border: 1px solid var(--zone-neutral); color: #8a6d00; }
 
 /* ---------- Gauge ---------- */
 .gauge { max-width: 480px; margin: 8px auto 0; }
@@ -80,7 +83,7 @@ html, body {
 }
 .compare-item {
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-  padding: 16px 10px; text-align: center;
+  padding: 16px 10px; text-align: center; box-shadow: var(--card-shadow);
 }
 .compare-label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
 .compare-gauge { width: 84px; margin: 0 auto; }
@@ -93,20 +96,20 @@ html, body {
   flex-wrap: wrap; margin-bottom: 8px;
 }
 .history__header .section-title { margin: 0; }
-.range-toggle { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+.range-toggle { display: inline-flex; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
 .range-btn {
   border: none; background: transparent; color: var(--muted);
   font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 7px; cursor: pointer;
 }
 .range-btn:hover { color: var(--text); }
-.range-btn.is-active { background: var(--panel-2); color: var(--text); }
+.range-btn.is-active { background: #ffffff; color: var(--text); box-shadow: var(--card-shadow); }
 .history__chart {
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-  padding: 12px 8px; margin-top: 12px;
+  padding: 12px 8px; margin-top: 12px; box-shadow: var(--card-shadow);
 }
 .chart-tooltip {
-  background: #0b0d12; border: 1px solid var(--border); border-radius: 8px;
-  padding: 6px 10px; font-size: 12px;
+  background: #ffffff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; box-shadow: var(--card-shadow);
 }
 .chart-tooltip__date { color: var(--muted); }
 .chart-tooltip__score { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
@@ -117,6 +120,7 @@ html, body {
 }
 .indicator-card {
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px;
+  box-shadow: var(--card-shadow);
 }
 .indicator-card.is-stale { opacity: 0.7; }
 .indicator-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }

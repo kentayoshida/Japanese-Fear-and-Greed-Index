@@ -70,30 +70,30 @@ export default function HistoryChart({ history }: { history: HistoryPoint[] }) {
                 y1={z.min}
                 y2={z.max}
                 fill={z.color}
-                fillOpacity={0.12}
+                fillOpacity={0.16}
                 ifOverflow="extendDomain"
               />
             ))}
             <XAxis
               dataKey="date"
-              tick={{ fill: "#9aa0a6", fontSize: 11 }}
+              tick={{ fill: "#6b7280", fontSize: 11 }}
               minTickGap={40}
               tickLine={false}
-              axisLine={{ stroke: "#2a2f3a" }}
+              axisLine={{ stroke: "#e2e5ea" }}
             />
             <YAxis
               domain={[0, 100]}
               ticks={[0, 25, 45, 55, 75, 100]}
-              tick={{ fill: "#9aa0a6", fontSize: 11 }}
+              tick={{ fill: "#6b7280", fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#2a2f3a" }}
+              axisLine={{ stroke: "#e2e5ea" }}
               width={32}
             />
             <Tooltip content={<CustomTooltip />} />
             <Line
               type="monotone"
               dataKey="score"
-              stroke="#f5f6f8"
+              stroke="#1a1d21"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}
