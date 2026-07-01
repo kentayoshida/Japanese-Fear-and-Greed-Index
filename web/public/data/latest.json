@@ -1,9 +1,9 @@
 {
   "as_of": "2026-06-30",
-  "score": 30.6,
+  "score": 25.0,
   "band": "Fear",
   "band_label_ja": "恐怖",
-  "coverage": 4,
+  "coverage": 5,
   "n_indicators": 8,
   "lookback_days": 252,
   "components": [
@@ -13,7 +13,7 @@
       "dimension": "momentum",
       "raw": 6.66267,
       "score": 25.1984,
-      "weight": 0.333333,
+      "weight": 0.25,
       "inverted": false,
       "stale": false
     },
@@ -41,19 +41,19 @@
       "id": "nikkei_vi",
       "label": "日経VI（ボラティリティ指数）",
       "dimension": "volatility",
-      "raw": null,
-      "score": null,
-      "weight": 0.0,
+      "raw": 38.3,
+      "score": 7.3413,
+      "weight": 0.25,
       "inverted": true,
-      "stale": true
+      "stale": false
     },
     {
       "id": "put_call_ratio",
       "label": "日経225オプション Put/Call レシオ",
       "dimension": "hedge_positioning",
       "raw": 2.422878,
-      "score": 6.3107,
-      "weight": 0.166667,
+      "score": 8.0153,
+      "weight": 0.125,
       "inverted": true,
       "stale": false
     },
@@ -73,7 +73,7 @@
       "dimension": "hedge_positioning",
       "raw": 35.915104,
       "score": 87.8968,
-      "weight": 0.166667,
+      "weight": 0.125,
       "inverted": true,
       "stale": false
     },
@@ -83,19 +83,18 @@
       "dimension": "safe_haven",
       "raw": 1.318802,
       "score": 19.6429,
-      "weight": 0.333333,
+      "weight": 0.25,
       "inverted": false,
       "stale": false
     }
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-07-01T05:56:03.572760+00:00",
+  "generated_at": "2026-07-01T06:25:36.911993+00:00",
   "mode": "real",
   "fetch_errors": {
-    "nikkei_vi": "nikkei_vi(stooq): 404 Client Error: Not Found for url: https://stooq.com/q/d/l/?s=n145.jp&i=d",
     "advance_decline_25": "advance_decline: 25日ぶんの蓄積待ち",
-    "new_high_low": "要確認: 東証全体 新高値/新安値（J-Quants 全銘柄四本値から自前集計予定）",
-    "margin_pl_ratio": "要確認: 松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み）"
+    "new_high_low": "new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）",
+    "margin_pl_ratio": "要確認: 松井証券『投資指標（店内）』日次値（前営業日更新・ToS確認済み・結線作業中）"
   }
 }
