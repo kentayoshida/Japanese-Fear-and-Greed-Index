@@ -4,6 +4,7 @@
 // 前営業日 / 1週間前 / 1か月前 / 1年前 のスコアを「数値＋ゾーン色」で横並び表示。
 
 import { HistoryPoint, labelForScore, colorForScore, lookupAtOffset } from "@/lib/fgi";
+import MiniGauge from "./MiniGauge";
 
 type Item = { label: string; offset: number };
 
@@ -25,8 +26,8 @@ export default function ComparisonStrip({ history }: { history: HistoryPoint[] }
             <div className="compare-label">{it.label}</div>
             {pt ? (
               <>
-                <div className="compare-dot" style={{ background: colorForScore(pt.score) }}>
-                  {Math.round(pt.score)}
+                <div className="compare-gauge">
+                  <MiniGauge score={pt.score} />
                 </div>
                 <div className="compare-zone" style={{ color: colorForScore(pt.score) }}>
                   {labelForScore(pt.score)}
@@ -34,7 +35,9 @@ export default function ComparisonStrip({ history }: { history: HistoryPoint[] }
               </>
             ) : (
               <>
-                <div className="compare-dot compare-dot--empty">—</div>
+                <div className="compare-gauge">
+                  <MiniGauge score={null} />
+                </div>
                 <div className="compare-zone compare-zone--empty">データなし</div>
               </>
             )}
