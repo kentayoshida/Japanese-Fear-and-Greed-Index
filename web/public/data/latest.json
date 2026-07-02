@@ -1,9 +1,9 @@
 {
-  "as_of": "2026-06-30",
-  "score": 25.0,
+  "as_of": "2026-07-02",
+  "score": 33.3,
   "band": "Fear",
   "band_label_ja": "恐怖",
-  "coverage": 5,
+  "coverage": 7,
   "n_indicators": 8,
   "lookback_days": 252,
   "components": [
@@ -11,9 +11,9 @@
       "id": "momentum_125dma",
       "label": "TOPIX vs 125日線乖離率",
       "dimension": "momentum",
-      "raw": 6.66267,
-      "score": 25.1984,
-      "weight": 0.25,
+      "raw": 6.975221,
+      "score": 27.9762,
+      "weight": 0.166667,
       "inverted": false,
       "stale": false
     },
@@ -21,11 +21,11 @@
       "id": "advance_decline_25",
       "label": "騰落レシオ（東証プライム・25日）",
       "dimension": "breadth",
-      "raw": null,
-      "score": null,
-      "weight": 0.0,
+      "raw": 99.921036,
+      "score": 49.8684,
+      "weight": 0.166667,
       "inverted": false,
-      "stale": true
+      "stale": false
     },
     {
       "id": "new_high_low",
@@ -41,9 +41,9 @@
       "id": "nikkei_vi",
       "label": "日経VI（ボラティリティ指数）",
       "dimension": "volatility",
-      "raw": 38.3,
-      "score": 7.3413,
-      "weight": 0.25,
+      "raw": 33.78,
+      "score": 20.4365,
+      "weight": 0.166667,
       "inverted": true,
       "stale": false
     },
@@ -51,9 +51,9 @@
       "id": "put_call_ratio",
       "label": "日経225オプション Put/Call レシオ",
       "dimension": "hedge_positioning",
-      "raw": 2.422878,
-      "score": 7.9114,
-      "weight": 0.125,
+      "raw": 2.375164,
+      "score": 7.9235,
+      "weight": 0.083333,
       "inverted": true,
       "stale": false
     },
@@ -61,19 +61,19 @@
       "id": "margin_pl_ratio",
       "label": "信用評価損益率（買い方）",
       "dimension": "leverage",
-      "raw": null,
-      "score": null,
-      "weight": 0.0,
+      "raw": -3.423,
+      "score": 82.885,
+      "weight": 0.166667,
       "inverted": false,
-      "stale": true
+      "stale": false
     },
     {
       "id": "short_selling_ratio",
       "label": "空売り比率（東証）",
       "dimension": "hedge_positioning",
-      "raw": 35.915104,
-      "score": 87.8968,
-      "weight": 0.125,
+      "raw": 43.471805,
+      "score": 2.1825,
+      "weight": 0.083333,
       "inverted": true,
       "stale": false
     },
@@ -81,20 +81,18 @@
       "id": "safe_haven",
       "label": "セーフヘイブン需要（株式 − 債券 20日リターン差）",
       "dimension": "safe_haven",
-      "raw": 1.318802,
-      "score": 19.6429,
-      "weight": 0.25,
+      "raw": 0.616595,
+      "score": 13.2937,
+      "weight": 0.166667,
       "inverted": false,
       "stale": false
     }
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-07-01T06:37:15.499071+00:00",
+  "generated_at": "2026-07-02T06:12:46.271436+00:00",
   "mode": "real",
   "fetch_errors": {
-    "advance_decline_25": "advance_decline: 25日ぶんの蓄積待ち",
-    "new_high_low": "new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）",
-    "margin_pl_ratio": "margin_pl_ratio: Page.goto: Timeout 60000ms exceeded.\nCall log:\n  - navigating to \"https://www.matsui.co.jp/market/stock/netstock-info/\", waiting until \"networkidle\"\n"
+    "new_high_low": "new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）"
   }
 }
