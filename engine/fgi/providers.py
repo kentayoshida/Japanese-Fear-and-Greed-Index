@@ -26,9 +26,32 @@ import os
 import numpy as np
 import pandas as pd
 
-from .config import Config
+from .config import Config, Variant
 from .fetchers.base import FetchError, IndicatorSeries, validate_series
 from .fetchers.derive import momentum_125dma
+
+
+def _equity_close(config: Config, equity: dict) -> pd.Series:
+    """版の株式指数終値系列を取得する（#1 モメンタム・#8 株式レッグ用）。
+
+    source=jquants は指数四本値（code 指定, 例 0000=TOPIX）、source=stooq は
+    日次CSV（symbol 指定, 例 ^nkx=日経225）。J-Quants は日経225を配信しないため
+    日経225版は stooq を使う（Ken 決定A）。
+    """
+    from datetime import datetime, timedelta
+
+    src = equity.get("source", "jquants")
+    if src == "jquants":
+        from .fetchers.jquants import JQuantsClient
+
+        if not JQuantsClient.is_configured():
+            raise FetchError("equity_close(jquants): APIキー未設定")
+        client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
+        from_date = (datetime.utcnow() - timedelta(days=900)).strftime("%Y-%m-%d")
+        return client.index_close(code=equity.get("code", "0000"), from_date=from_date)
+    if src == "stooq":
+        return _stooq_close(equity.get("symbol", "^nkx"))
+    raise FetchError(f"equity_close: 未対応 source={src}")
 
 
 # =============================================================================
@@ -236,19 +259,21 @@ def _provide_nikkei_vi(config: Config, series: dict, errors: dict) -> None:
         errors["nikkei_vi"] = f"nikkei_vi(official): {exc}"
 
 
-def _provide_safe_haven(config: Config, client, series: dict, errors: dict) -> None:
-    """#8 セーフヘイブン：株式(TOPIX) − 債券(国債ETF調整後終値) の20日リターン差。"""
+def _provide_safe_haven(config: Config, client, variant: Variant, series: dict, errors: dict) -> None:
+    """#8 セーフヘイブン：株式(版の指数) − 債券(国債ETF調整後終値) の20日リターン差。
+
+    株式レッグは版ごと（TOPIX は J-Quants、日経225 は stooq）、債券レッグは全版共通。
+    """
     from datetime import datetime, timedelta
 
     from .fetchers.derive import safe_haven
 
     try:
         jq = config.sources.get("jquants", {})
-        eq_code = jq.get("equity_index_code", "0000")
         bond_code = jq.get("bond_etf_code", "2510")
         from_date = (datetime.utcnow() + timedelta(hours=9)
                      - timedelta(days=int(config.lookback_days * 1.6) + 40)).strftime("%Y-%m-%d")
-        eq = client.index_close(code=eq_code, from_date=from_date)      # TOPIX 現物
+        eq = _equity_close(config, variant.equity)                     # 版の株式指数
         bond = client.equity_adj_close(bond_code, from_date=from_date)  # 国債ETF 調整後終値
         sh = safe_haven(eq, bond, window=20)
         if len(sh) == 0:
@@ -361,12 +386,15 @@ def _weekly_margin_long_cache(config: Config, client) -> pd.Series:
     return merged
 
 
-def _provide_margin_pl(config: Config, client, series: dict, errors: dict) -> None:
+def _provide_margin_pl(config: Config, client, series: dict, errors: dict,
+                       scrape_latest: bool = True) -> None:
     """#6 信用評価損益率（買い方）。仕様 §2 の三層構成：
       tier-1: 松井『投資指標(店内)』を Playwright で取得（正・最新営業日のみ）
       tier-2: 週次信用買い残 × 指数の在庫平均コスト MTM 近似（過去日を日次補完）
       tier-3: 重複日で tier-2 を tier-1 にオフセット較正し、観測日は実測で上書き
-    松井が取れなくても MTM で継続、MTM が組めなくても松井のみで継続する。"""
+    松井が取れなくても MTM で継続、MTM が組めなくても松井のみで継続する。
+    #6 は市場全体の指標のため全版共通。scrape_latest=False の版はキャッシュを再利用し
+    松井への再アクセスを避ける（ToS：取得は日次1回に限る）。"""
     from datetime import datetime, timedelta
 
     from .fetchers.derive import margin_pl_mtm
@@ -374,16 +402,17 @@ def _provide_margin_pl(config: Config, client, series: dict, errors: dict) -> No
     # --- tier-1: 松井（正）。取得できたら observed 系列(margin_pl_ratio.csv)に蓄積 ---
     matsui_path = _series_cache_path(config, "margin_pl_ratio")
     matsui = _load_series_cache(matsui_path)
-    try:
-        from .fetchers.matsui import fetch_margin_pl_buy
+    if scrape_latest:
+        try:
+            from .fetchers.matsui import fetch_margin_pl_buy
 
-        value = fetch_margin_pl_buy()
-        as_of = pd.Timestamp((datetime.utcnow() + timedelta(hours=9)).date())
-        matsui = pd.concat([matsui, pd.Series({as_of: float(value)})]).sort_index()
-        matsui = matsui[~matsui.index.duplicated(keep="last")]
-        _save_series_cache(matsui_path, matsui)
-    except Exception as exc:  # noqa: BLE001  松井不通でも tier-2 で継続
-        errors.setdefault("margin_pl_ratio_matsui", f"matsui: {exc}")
+            value = fetch_margin_pl_buy()
+            as_of = pd.Timestamp((datetime.utcnow() + timedelta(hours=9)).date())
+            matsui = pd.concat([matsui, pd.Series({as_of: float(value)})]).sort_index()
+            matsui = matsui[~matsui.index.duplicated(keep="last")]
+            _save_series_cache(matsui_path, matsui)
+        except Exception as exc:  # noqa: BLE001  松井不通でも tier-2 で継続
+            errors.setdefault("margin_pl_ratio_matsui", f"matsui: {exc}")
 
     # --- tier-2: 週次買い残 × 指数の MTM 近似（J-Quants 未設定時はスキップ）---
     mtm = None
@@ -481,33 +510,42 @@ def _provide_new_high_low(config: Config, client, series: dict, errors: dict) ->
         errors["new_high_low"] = f"new_high_low: {exc}"
 
 
-def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
+def _provide_real(config: Config, variant: Variant,
+                  scrape_matsui: bool = True) -> tuple[dict[str, IndicatorSeries], dict[str, str]]:
+    """1つの版（variant）の生値系列を組み立てる。
+
+    版ごとに変わるのは #1 モメンタム・#8 セーフヘイブンの株式レッグのみ。
+    市場全体系（#2〜#7）は全版共通で、CSV キャッシュを介するため2版目以降は
+    追加のAPI取得がほぼ発生しない（松井は scrape_matsui で1回に限定）。
+    """
     from .fetchers.jquants import JQuantsClient
 
     series: dict[str, IndicatorSeries] = {}
     errors: dict[str, str] = {}
 
-    # ---- #1 モメンタム（指数価格から計算）----
+    # ---- #1 モメンタム（版の株式指数から計算）----
     try:
-        close = _nikkei_close_real(config)
-        # TOPIX(現状 約4000)。異常値・誤指数の検知のためレンジ検証（広めの安全域）。
-        close = validate_series(close, indicator_id="topix_close", min_value=300, max_value=20000,
-                                min_points=130)
+        close = _equity_close(config, variant.equity)
+        eqmin = float(variant.equity.get("min", 300))
+        eqmax = float(variant.equity.get("max", 20000))
+        close = validate_series(close, indicator_id=f"{variant.key}_equity_close",
+                                min_value=eqmin, max_value=eqmax, min_points=130)
         dev = momentum_125dma(close)
-        series["momentum_125dma"] = IndicatorSeries("momentum_125dma", dev, "jquants_or_stooq")
+        series["momentum_125dma"] = IndicatorSeries(
+            "momentum_125dma", dev, variant.equity.get("source", "jquants"))
     except FetchError as exc:
         errors["momentum_125dma"] = str(exc)
 
-    # ---- #4 日経VI（stooq N145.JP。J-Quants非配信のため）----
+    # ---- #4 日経VI（日経公式CSV。全版共通）----
     _provide_nikkei_vi(config, series, errors)
 
-    # ---- #5 P/Cレシオ・#7 空売り比率（J-Quants v2 一次データ）----
+    # ---- #2/#3/#5/#7/#8（J-Quants v2 一次データ）----
     client = None
     if JQuantsClient.is_configured():
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
         _provide_put_call(config, client, series, errors)
         _provide_short_ratio(config, client, series, errors)
-        _provide_safe_haven(config, client, series, errors)
+        _provide_safe_haven(config, client, variant, series, errors)
         _provide_advance_decline(config, client, series, errors)
         _provide_new_high_low(config, client, series, errors)
     else:
@@ -515,12 +553,28 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
                   "advance_decline_25", "new_high_low"):
             errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
-    # ---- #6 信用評価損益率（松井 tier-1 + 週次買い残 MTM tier-2）----
-    _provide_margin_pl(config, client, series, errors)
+    # ---- #6 信用評価損益率（松井 tier-1 + 週次買い残 MTM tier-2。全版共通）----
+    _provide_margin_pl(config, client, series, errors, scrape_latest=scrape_matsui)
 
-    if errors:
-        _provide_real.last_errors = errors  # type: ignore[attr-defined]
-    return series
+    return series, errors
+
+
+def provide_variants(
+    config: Config, mode: str = "real"
+) -> dict[str, tuple[dict[str, IndicatorSeries], dict[str, str]]]:
+    """全版の (生値系列, errors) を版キーごとに返す。
+
+    real は版を順に処理し、松井スクレイプは最初の版のみ実行（残りはキャッシュ再利用）。
+    demo は合成データを全版に複製する（版差は指数レッグのみで合成では区別しないため）。
+    """
+    if mode == "demo":
+        return {v.key: (_provide_demo(config), {}) for v in config.variants}
+    if mode == "real":
+        out: dict[str, tuple[dict[str, IndicatorSeries], dict[str, str]]] = {}
+        for i, v in enumerate(config.variants):
+            out[v.key] = _provide_real(config, v, scrape_matsui=(i == 0))
+        return out
+    raise ValueError(f"unknown provider mode: {mode}")
 
 
 # =============================================================================
@@ -569,14 +623,10 @@ def _provide_demo(config: Config, n_days: int = 420, seed: int = 20260628) -> di
 # 公開エントリ
 # =============================================================================
 def provide(config: Config, mode: str = "real") -> tuple[dict[str, IndicatorSeries], dict[str, str]]:
-    """mode に応じて生値系列を返す。
+    """既定版の生値系列を返す（後方互換）。全版は provide_variants を使う。
 
     返り値: (raw_series, errors)。errors は取得失敗した指標 id → 理由。
     """
-    if mode == "demo":
-        return _provide_demo(config), {}
-    if mode == "real":
-        series = _provide_real(config)
-        errors = getattr(_provide_real, "last_errors", {})
-        return series, dict(errors)
-    raise ValueError(f"unknown provider mode: {mode}")
+    results = provide_variants(config, mode)
+    default = config.default_variant()
+    return results[default.key]

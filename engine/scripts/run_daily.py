@@ -23,15 +23,20 @@ import pandas as pd
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ENGINE_ROOT))
 
-from fgi.config import load_config  # noqa: E402
+from fgi.config import load_config, variant_config  # noqa: E402
 from fgi.pipeline import build_history, build_latest, union_business_dates  # noqa: E402
-from fgi.providers import provide  # noqa: E402
+from fgi.providers import provide_variants  # noqa: E402
 
 
 def _resolve_out_path(engine_root: Path, rel: str) -> Path:
     p = (engine_root / rel).resolve()
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _variant_path(base: Path, key: str) -> Path:
+    """latest.json → latest.<key>.json のように版キーを差し込む。"""
+    return base.with_name(f"{base.stem}.{key}{base.suffix}")
 
 
 def main() -> int:
@@ -42,43 +47,74 @@ def main() -> int:
     args = ap.parse_args()
 
     config = load_config(args.config)
-    raw_series, errors = provide(config, mode=args.mode)
+    results = provide_variants(config, mode=args.mode)
 
-    if not raw_series:
-        print("ERROR: 取得できた指標が1つもありません。出力を中止します。", file=sys.stderr)
-        for k, v in errors.items():
-            print(f"  - {k}: {v}", file=sys.stderr)
+    latest_base = _resolve_out_path(ENGINE_ROOT, config.output["latest_path"])
+    history_base = _resolve_out_path(ENGINE_ROOT, config.output["history_path"])
+    start = pd.Timestamp(args.history_start) if args.history_start else None
+
+    manifest_variants: list[dict] = []
+    produced = 0
+    for v in config.variants:
+        raw_series, errors = results.get(v.key, ({}, {}))
+        if not raw_series:
+            print(f"[{v.key}] 取得できた指標が1つもありません。この版はスキップします。",
+                  file=sys.stderr)
+            for k, msg in errors.items():
+                print(f"    - {k}: {msg}", file=sys.stderr)
+            continue
+
+        vcfg = variant_config(config, v)
+        as_of = max(s.latest_date() for s in raw_series.values())
+
+        latest = build_latest(vcfg, raw_series, as_of)
+        latest["generated_at"] = datetime.now(timezone.utc).isoformat()
+        latest["mode"] = args.mode
+        latest["variant"] = v.key
+        latest["variant_label"] = v.label_ja
+        if args.mode == "demo":
+            latest["sample"] = True  # 合成データであることを明示
+        if errors:
+            latest["fetch_errors"] = errors  # 取得不能だった指標と理由（透明性）
+
+        dates = union_business_dates(raw_series, start=start)
+        history = build_history(vcfg, raw_series, dates)
+
+        # 版別ファイル
+        vlatest = _variant_path(latest_base, v.key)
+        vhistory = _variant_path(history_base, v.key)
+        vlatest.write_text(json.dumps(latest, ensure_ascii=False, indent=2), encoding="utf-8")
+        vhistory.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+        # 既定版は latest.json / history.json も兼ねる（後方互換）
+        if v.default:
+            latest_base.write_text(json.dumps(latest, ensure_ascii=False, indent=2), encoding="utf-8")
+            history_base.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+
+        manifest_variants.append({"key": v.key, "label_ja": v.label_ja, "default": v.default})
+        produced += 1
+
+        print(f"[{args.mode}:{v.key}] as_of={latest['as_of']} score={latest['score']} "
+              f"band={latest['band']} coverage={latest['coverage']}/{latest['n_indicators']}")
+        print(f"  latest : {vlatest}")
+        print(f"  history: {vhistory} ({len(history)} rows)")
+        if errors:
+            print("  未取得（stale 扱い）:")
+            for k, msg in errors.items():
+                print(f"    - {k}: {msg}")
+
+    if produced == 0:
+        print("ERROR: どの版も出力できませんでした。", file=sys.stderr)
         return 1
 
-    # 評価基準日 = 取得できた全系列の最大公表日
-    as_of = max(s.latest_date() for s in raw_series.values())
-
-    latest = build_latest(config, raw_series, as_of)
-    latest["generated_at"] = datetime.now(timezone.utc).isoformat()
-    latest["mode"] = args.mode
-    if args.mode == "demo":
-        latest["sample"] = True  # 合成データであることを明示
-    if errors:
-        latest["fetch_errors"] = errors  # 取得不能だった指標と理由（透明性）
-
-    start = pd.Timestamp(args.history_start) if args.history_start else None
-    dates = union_business_dates(raw_series, start=start)
-    history = build_history(config, raw_series, dates)
-
-    latest_path = _resolve_out_path(ENGINE_ROOT, config.output["latest_path"])
-    history_path = _resolve_out_path(ENGINE_ROOT, config.output["history_path"])
-
-    latest_path.write_text(json.dumps(latest, ensure_ascii=False, indent=2), encoding="utf-8")
-    history_path.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
-
-    print(f"[{args.mode}] as_of={latest['as_of']} score={latest['score']} "
-          f"band={latest['band']} coverage={latest['coverage']}/{latest['n_indicators']}")
-    print(f"  latest : {latest_path}")
-    print(f"  history: {history_path} ({len(history)} rows)")
-    if errors:
-        print("  未取得（stale 扱い）:")
-        for k, v in errors.items():
-            print(f"    - {k}: {v}")
+    # 版一覧マニフェスト（フロントのタブ生成用）
+    manifest_path = latest_base.with_name("variants.json")
+    manifest_path.write_text(
+        json.dumps({"variants": manifest_variants,
+                    "generated_at": datetime.now(timezone.utc).isoformat()},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"  manifest: {manifest_path} ({produced} 版)")
     return 0
 
 
