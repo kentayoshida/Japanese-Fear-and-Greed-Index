@@ -49,6 +49,12 @@ def _equity_close(config: Config, equity: dict) -> pd.Series:
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
         from_date = (datetime.utcnow() - timedelta(days=900)).strftime("%Y-%m-%d")
         return client.index_close(code=equity.get("code", "0000"), from_date=from_date)
+    if src == "nikkei_csv":
+        url = equity.get("csv_url")
+        if not url:
+            raise FetchError("equity_close(nikkei_csv): csv_url 未設定")
+        # 日経公式の日次CSV（VIと同じ構造・パーサ。終値列を検出）。
+        return _nikkei_official_ohlc_csv(url, equity.get("encoding", "cp932"))
     if src == "stooq":
         return _stooq_close(equity.get("symbol", "^nkx"))
     raise FetchError(f"equity_close: 未対応 source={src}")
@@ -191,9 +197,14 @@ def _stooq_close(symbol: str) -> pd.Series:
     from io import StringIO
 
     url = f"https://stooq.com/q/d/l/?s={symbol}&i=d"
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    df = pd.read_csv(StringIO(resp.text))
+    try:
+        resp = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0 (fgi)"})
+        resp.raise_for_status()
+        df = pd.read_csv(StringIO(resp.text))
+    except FetchError:
+        raise
+    except Exception as exc:  # noqa: BLE001  HTTPError 等も FetchError に正規化
+        raise FetchError(f"stooq({symbol}): {exc}") from exc
     if "Close" not in df.columns or "Date" not in df.columns:
         raise FetchError(f"stooq({symbol}): unexpected columns {list(df.columns)}")
     return pd.Series(
@@ -201,8 +212,8 @@ def _stooq_close(symbol: str) -> pd.Series:
     ).dropna().sort_index()
 
 
-def _nikkei_vi_official_csv(url: str, encoding: str = "cp932") -> pd.Series:
-    """日経公式の日経VI日次CSV（Shift_JIS）を取得して終値系列を返す。
+def _nikkei_official_ohlc_csv(url: str, encoding: str = "cp932") -> pd.Series:
+    """日経公式の日次CSV（Shift_JIS）を取得して終値系列を返す（日経VI/日経225 共通）。
 
     先頭のタイトル行・末尾の注記行が混在するため、日付として解釈できる行だけを拾い、
     ヘッダから『終値』列位置を特定してパースする（列順の揺れに頑健化）。
@@ -250,7 +261,7 @@ def _provide_nikkei_vi(config: Config, series: dict, errors: dict) -> None:
         url = cfg.get("csv_url")
         if not url:
             raise FetchError("nikkei_vi: config の csv_url 未設定")
-        s = _nikkei_vi_official_csv(url, cfg.get("encoding", "cp932"))
+        s = _nikkei_official_ohlc_csv(url, cfg.get("encoding", "cp932"))
         s = validate_series(s, indicator_id="nikkei_vi", min_value=5, max_value=200, min_points=60)
         series["nikkei_vi"] = IndicatorSeries("nikkei_vi", s, "nikkei_official")
     except FetchError as exc:
@@ -535,6 +546,8 @@ def _provide_real(config: Config, variant: Variant,
             "momentum_125dma", dev, variant.equity.get("source", "jquants"))
     except FetchError as exc:
         errors["momentum_125dma"] = str(exc)
+    except Exception as exc:  # noqa: BLE001  株式指数の取得失敗で全体を落とさない
+        errors["momentum_125dma"] = f"momentum_125dma: {exc}"
 
     # ---- #4 日経VI（日経公式CSV。全版共通）----
     _provide_nikkei_vi(config, series, errors)
@@ -572,7 +585,11 @@ def provide_variants(
     if mode == "real":
         out: dict[str, tuple[dict[str, IndicatorSeries], dict[str, str]]] = {}
         for i, v in enumerate(config.variants):
-            out[v.key] = _provide_real(config, v, scrape_matsui=(i == 0))
+            # 1つの版が丸ごと失敗しても他版の出力を止めない（版ごとに隔離）。
+            try:
+                out[v.key] = _provide_real(config, v, scrape_matsui=(i == 0))
+            except Exception as exc:  # noqa: BLE001
+                out[v.key] = ({}, {"_variant": f"{v.key}: {exc}"})
         return out
     raise ValueError(f"unknown provider mode: {mode}")
 
