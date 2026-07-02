@@ -56,6 +56,20 @@ html, body {
 }
 .hero__meta .dot { opacity: 0.5; }
 
+/* ---------- Variant tabs (TOPIX版 / 日経225版) ---------- */
+.variant-tabs {
+  display: inline-flex; gap: 4px; margin: 16px auto 4px;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px;
+}
+.variant-tab {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 14px; font-weight: 700; padding: 8px 18px; border-radius: 9px;
+  cursor: pointer; transition: color 0.15s, background 0.15s;
+}
+.variant-tab:hover { color: var(--text); }
+.variant-tab.is-active { background: #ffffff; color: var(--text); box-shadow: var(--card-shadow); }
+
 .notice {
   margin: 14px auto; max-width: 620px; padding: 10px 14px; border-radius: 10px;
   font-size: 13px; line-height: 1.5;

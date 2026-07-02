@@ -5,7 +5,7 @@ import Gauge from "@/components/Gauge";
 import ComparisonStrip from "@/components/ComparisonStrip";
 import HistoryChart from "@/components/HistoryChart";
 import IndicatorCard from "@/components/IndicatorCard";
-import { Latest, HistoryPoint } from "@/lib/fgi";
+import { Latest, HistoryPoint, VariantInfo, VariantsManifest } from "@/lib/fgi";
 
 // 静的 JSON は GitHub Actions の日次 cron が再生成・コミットする。
 // クライアントから取得するため、再デプロイ後に最新値が反映される。
@@ -15,22 +15,46 @@ async function loadJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+// レガシー（マニフェスト未生成）を表す擬似キー。latest.json/history.json を読む。
+const LEGACY = "__legacy__";
+
 export default function Page() {
+  const [variants, setVariants] = useState<VariantInfo[]>([]);
+  const [active, setActive] = useState<string | null>(null);
   const [latest, setLatest] = useState<Latest | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // ① 版マニフェストを読み、既定版をアクティブにする。無ければレガシー単一版。
   useEffect(() => {
+    loadJson<VariantsManifest>("/data/variants.json")
+      .then((m) => {
+        const vs = m.variants ?? [];
+        if (vs.length === 0) throw new Error("empty manifest");
+        setVariants(vs);
+        setActive((vs.find((v) => v.default) ?? vs[0]).key);
+      })
+      .catch(() => {
+        setVariants([]);
+        setActive(LEGACY);
+      });
+  }, []);
+
+  // ② アクティブ版のデータを読む（タブ切替で再取得）。読込中は前の値を保持。
+  useEffect(() => {
+    if (!active) return;
+    const suffix = active === LEGACY ? "" : `.${active}`;
     Promise.all([
-      loadJson<Latest>("/data/latest.json"),
-      loadJson<HistoryPoint[]>("/data/history.json"),
+      loadJson<Latest>(`/data/latest${suffix}.json`),
+      loadJson<HistoryPoint[]>(`/data/history${suffix}.json`),
     ])
       .then(([l, h]) => {
         setLatest(l);
         setHistory(h);
+        setError(null);
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [active]);
 
   if (error) {
     return (
@@ -56,6 +80,22 @@ export default function Page() {
         <p className="hero__sub">
           日本株式市場の投資家心理を8つの指標から 0〜100 の単一スコアに合成しています。
         </p>
+
+        {variants.length > 1 && (
+          <div className="variant-tabs" role="tablist" aria-label="指数版の切り替え">
+            {variants.map((v) => (
+              <button
+                key={v.key}
+                role="tab"
+                aria-selected={active === v.key}
+                className={`variant-tab${active === v.key ? " is-active" : ""}`}
+                onClick={() => setActive(v.key)}
+              >
+                {v.label_ja}版
+              </button>
+            ))}
+          </div>
+        )}
 
         {latest.sample && (
           <div className="notice notice--sample">

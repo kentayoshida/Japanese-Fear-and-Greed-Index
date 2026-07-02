@@ -10,6 +10,7 @@ export type Component = {
   weight: number;
   inverted: boolean;
   stale: boolean;
+  description?: string;
 };
 
 export type Latest = {
@@ -33,6 +34,18 @@ export type HistoryPoint = {
   score: number;
   band: string;
   coverage: number;
+};
+
+// 版（TOPIX版 / 日経225版）。variants.json のマニフェスト。
+export type VariantInfo = {
+  key: string;
+  label_ja: string;
+  default: boolean;
+};
+
+export type VariantsManifest = {
+  variants: VariantInfo[];
+  generated_at?: string;
 };
 
 // 5ゾーン定義（§5.1 のバンドと一致）。

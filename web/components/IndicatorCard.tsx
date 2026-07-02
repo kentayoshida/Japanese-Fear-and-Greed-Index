@@ -14,9 +14,10 @@ const DIMENSION_LABELS: Record<string, string> = {
   safe_haven: "安全資産選好",
 };
 
-// 指標ごとの一言説明（日本語オリジナル）。
+// 指標ごとの一言説明（データに description が無い場合のフォールバック）。
+// 通常は版別の説明（TOPIX / 日経225）が c.description で渡る。
 const DESCRIPTIONS: Record<string, string> = {
-  momentum_125dma: "TOPIXと125日移動平均の乖離。上方乖離は強気。",
+  momentum_125dma: "株価指数と125日移動平均の乖離。上方乖離は強気。",
   advance_decline_25: "値上がり÷値下がり銘柄数の25日累積。市場の幅。",
   new_high_low: "新高値−新安値のネット銘柄数。株価の地力。",
   nikkei_vi: "日経平均の予想変動率。高いほど不安（反転）。",
@@ -81,7 +82,7 @@ export default function IndicatorCard({ c }: { c: Component }) {
         <span className="indicator-card__weight">重み {(c.weight * 100).toFixed(1)}%</span>
       </div>
 
-      <p className="indicator-card__desc">{DESCRIPTIONS[c.id] ?? ""}</p>
+      <p className="indicator-card__desc">{c.description || DESCRIPTIONS[c.id] || ""}</p>
     </div>
   );
 }
