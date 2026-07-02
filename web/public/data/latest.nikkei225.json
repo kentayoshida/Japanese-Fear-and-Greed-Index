@@ -1,22 +1,22 @@
 {
   "as_of": "2026-07-02",
-  "score": 34.6,
-  "band": "Fear",
-  "band_label_ja": "恐怖",
+  "score": 47.8,
+  "band": "Neutral",
+  "band_label_ja": "中立",
   "coverage": 7,
   "n_indicators": 8,
   "lookback_days": 252,
   "components": [
     {
       "id": "momentum_125dma",
-      "label": "TOPIX vs 125日線乖離率",
+      "label": "日経225 vs 125日線乖離率",
       "dimension": "momentum",
-      "raw": 6.975221,
-      "score": 27.9762,
+      "raw": 20.399065,
+      "score": 90.6746,
       "weight": 0.166667,
       "inverted": false,
       "stale": false,
-      "description": "TOPIX が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
+      "description": "日経225 が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
     },
     {
       "id": "advance_decline_25",
@@ -56,7 +56,7 @@
       "label": "日経225オプション Put/Call レシオ",
       "dimension": "hedge_positioning",
       "raw": 2.375164,
-      "score": 8.4951,
+      "score": 7.6754,
       "weight": 0.083333,
       "inverted": true,
       "stale": false,
@@ -86,24 +86,23 @@
     },
     {
       "id": "safe_haven",
-      "label": "セーフヘイブン需要（TOPIX − 債券 20日リターン差）",
+      "label": "セーフヘイブン需要（日経225 − 債券 20日リターン差）",
       "dimension": "safe_haven",
-      "raw": 0.616595,
-      "score": 13.2937,
+      "raw": 3.26409,
+      "score": 30.3571,
       "weight": 0.166667,
       "inverted": false,
       "stale": false,
-      "description": "TOPIXと10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
+      "description": "日経225と10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
     }
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-07-02T07:12:27.559072+00:00",
+  "generated_at": "2026-07-02T07:12:29.438403+00:00",
   "mode": "real",
-  "variant": "topix",
-  "variant_label": "TOPIX",
+  "variant": "nikkei225",
+  "variant_label": "日経225",
   "fetch_errors": {
-    "new_high_low": "new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）",
-    "margin_pl_ratio_matsui": "matsui: Page.wait_for_selector: Timeout 45000ms exceeded.\nCall log:\n  - waiting for locator(\"tr:has-text('買い残')\") to be visible\n"
+    "new_high_low": "new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）"
   }
 }

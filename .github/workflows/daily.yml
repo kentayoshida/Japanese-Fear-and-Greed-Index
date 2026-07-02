@@ -27,9 +27,10 @@ jobs:
     env:
       TZ: Asia/Tokyo
       # J-Quants 認証情報（GitHub Secrets で設定。コードに直書きしない §6）
+      # v2 は APIキー方式（x-api-key）。JQUANTS_API_KEY を使用。
+      JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+      # 後方互換（v1 名・任意）
       JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
-      JQUANTS_MAIL_ADDRESS: ${{ secrets.JQUANTS_MAIL_ADDRESS }}
-      JQUANTS_PASSWORD: ${{ secrets.JQUANTS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +42,10 @@ jobs:
       - name: 依存関係のインストール
         working-directory: engine
         run: pip install -r requirements.txt
+
+      - name: Playwright（#6 松井のヘッドレス描画用）
+        working-directory: engine
+        run: python -m playwright install --with-deps chromium
 
       - name: スコア再生成
         working-directory: engine
@@ -54,7 +59,19 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add web/public/data
             git commit -m "chore(data): 日次スコア再生成 ($(date +%Y-%m-%d))"
-            git push
+            # 並行実行やブランチ更新で push が弾かれる場合に備え、rebase + リトライ。
+            branch="${GITHUB_REF_NAME}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin "HEAD:${branch}"; then
+                echo "push 成功（試行 ${attempt}）"; exit 0
+              fi
+              echo "push 失敗（試行 ${attempt}）。fetch + rebase して再試行します。"
+              git fetch origin "${branch}"
+              git rebase "origin/${branch}" || { git rebase --abort; exit 1; }
+              sleep $((attempt * 2))
+            done
+            echo "push を複数回試行しましたが失敗しました。" >&2
+            exit 1
           else
             echo "変更なし。コミットをスキップします。"
           fi

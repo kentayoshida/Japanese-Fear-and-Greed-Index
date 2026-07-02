@@ -38,14 +38,34 @@ def base_weights(config: Config) -> dict[str, float]:
 
 
 def available_weights(config: Config, available_ids: list[str]) -> dict[str, float]:
-    """採用できた指標のみで再正規化した重みを返す（合計=1）。
+    """採用できた指標のみで、**次元レベルで**再正規化した重みを返す（合計=1）。仕様 §4.1b。
 
-    欠損指標を 50（中立）で埋めるのではなく、重みを採用指標に按分する（§3.4）。
+    手順：
+      1. 採用指標を次元ごとに束ねる。少なくとも1指標が採用された次元を「採用次元」とする。
+      2. 採用次元の重みを合計1.0に再正規化（各次元重み ÷ 採用次元重み合計）。
+      3. 各次元の重みを、その次元で採用された指標に均等配分。
+
+    これにより、2指標次元（例 ブレッドス／ヘッジ）の片方だけ欠損しても、その次元の
+    重みは縮まず残った1指標に集約される（欠損を中立値で埋めない §3.4 と一貫）。
     available_ids が空なら空 dict を返す。
     """
-    base = base_weights(config)
-    present = {i: base[i] for i in available_ids if i in base}
-    total = sum(present.values())
-    if total <= 0:
+    id_to_dim = {ind.id: ind.dimension for ind in config.indicators}
+    by_dim: dict[str, list[str]] = defaultdict(list)
+    for ind_id in available_ids:
+        dim = id_to_dim.get(ind_id)
+        if dim is not None:
+            by_dim[dim].append(ind_id)
+    if not by_dim:
         return {}
-    return {i: w / total for i, w in present.items()}
+
+    dim_total = sum(config.dimensions[d].weight for d in by_dim)
+    if dim_total <= 0:
+        return {}
+
+    weights: dict[str, float] = {}
+    for dim, ids in by_dim.items():
+        dim_w = config.dimensions[dim].weight / dim_total  # 採用次元で再正規化
+        per = dim_w / len(ids)                              # 次元内は採用指標で均等
+        for ind_id in ids:
+            weights[ind_id] = per
+    return weights

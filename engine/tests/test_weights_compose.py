@@ -40,6 +40,32 @@ def test_available_weights_renormalize():
     assert abs(w["momentum_125dma"] - 0.5) < 1e-6
 
 
+def test_partial_dimension_drop_keeps_dimension_weight():
+    # §4.1b: ヘッジ次元(2指標)の片方 #5 が欠損しても、次元重みは縮まず #7 に集約。
+    cfg = _cfg()
+    all_ids = [i.id for i in cfg.indicators]
+    ids = [i for i in all_ids if i != "put_call_ratio"]  # #5 のみ欠損
+    w = available_weights(cfg, ids)
+    assert abs(sum(w.values()) - 1.0) < 1e-9
+    # 全次元が残る（hedge_positioning は #7 のみ採用）→ 6次元均等 = 各1/6
+    # 単独次元 #1 は 1/6、hedge の #7 も次元を独占するので 1/6
+    assert abs(w["short_selling_ratio"] - 1 / 6) < 1e-9
+    assert abs(w["momentum_125dma"] - 1 / 6) < 1e-9
+    # breadth は2指標残るので各 1/12
+    assert abs(w["advance_decline_25"] - 1 / 12) < 1e-9
+
+
+def test_dimension_drop_renormalizes_to_five():
+    # §4.1b: #6(leverage 単独)が欠損 → 5次元。単独 1/5、2指標次元 各1/10。
+    cfg = _cfg()
+    ids = [i.id for i in cfg.indicators if i.id != "margin_pl_ratio"]
+    w = available_weights(cfg, ids)
+    assert abs(sum(w.values()) - 1.0) < 1e-9
+    assert abs(w["momentum_125dma"] - 1 / 5) < 1e-9
+    assert abs(w["advance_decline_25"] - 1 / 10) < 1e-9
+    assert abs(w["put_call_ratio"] - 1 / 10) < 1e-9
+
+
 def test_band_boundaries():
     cfg = _cfg()
     assert band_for_score(cfg, 0)[0] == "Extreme Fear"

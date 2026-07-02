@@ -57,7 +57,7 @@ export default function Gauge({ score }: { score: number | null }) {
       <svg viewBox="0 0 400 250" role="img" aria-label={`現在のスコア ${hasScore ? Math.round(value) : "—"}（${zone.labelJa}）`}>
         {/* 5ゾーンのアーチ */}
         {ZONES.map((z) => (
-          <path key={z.key} d={ringSectorPath(z.min, z.max)} fill={z.color} stroke="#0b0d12" strokeWidth={1.5} />
+          <path key={z.key} d={ringSectorPath(z.min, z.max)} fill={z.color} stroke="#ffffff" strokeWidth={2} />
         ))}
 
         {/* 目盛り（0 / 25 / 45 / 55 / 75 / 100） */}
@@ -69,7 +69,7 @@ export default function Gauge({ score }: { score: number | null }) {
           return (
             <g key={t}>
               <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#6b7280" strokeWidth={1.5} />
-              <text x={lab.x} y={lab.y} fontSize={11} fill="#9aa0a6" textAnchor="middle" dominantBaseline="middle">
+              <text x={lab.x} y={lab.y} fontSize={11} fill="#6b7280" textAnchor="middle" dominantBaseline="middle">
                 {t}
               </text>
             </g>
@@ -81,15 +81,15 @@ export default function Gauge({ score }: { score: number | null }) {
           <g className="needle" style={{ transformOrigin: `${CX}px ${CY}px` }}>
             <polygon
               points={`${baseL.x.toFixed(2)},${baseL.y.toFixed(2)} ${tip.x.toFixed(2)},${tip.y.toFixed(2)} ${baseR.x.toFixed(2)},${baseR.y.toFixed(2)}`}
-              fill="#f5f6f8"
+              fill="#1a1d21"
             />
-            <circle cx={CX} cy={CY} r={16} fill="#f5f6f8" />
-            <circle cx={CX} cy={CY} r={8} fill="#0b0d12" />
+            <circle cx={CX} cy={CY} r={16} fill="#1a1d21" />
+            <circle cx={CX} cy={CY} r={7} fill="#ffffff" />
           </g>
         )}
 
         {/* 中央のスコアとレーティング（針の基部より上に配置して重なりを避ける） */}
-        <text x={CX} y={CY - 58} textAnchor="middle" fontSize={64} fontWeight={800} fill="#f5f6f8" style={{ fontVariantNumeric: "tabular-nums" }}>
+        <text x={CX} y={CY - 58} textAnchor="middle" fontSize={64} fontWeight={800} fill="#1a1d21" style={{ fontVariantNumeric: "tabular-nums" }}>
           {hasScore ? Math.round(value) : "—"}
         </text>
         <text x={CX} y={CY - 28} textAnchor="middle" fontSize={19} fontWeight={700} fill={zone.color}>

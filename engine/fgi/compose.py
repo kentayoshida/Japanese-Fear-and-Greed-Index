@@ -23,6 +23,7 @@ class ComponentScore:
     score: float | None   # 0〜100。stale/欠損時は None
     inverted: bool
     stale: bool = False
+    description_ja: str = ""
 
 
 def band_for_score(config: Config, score: float) -> tuple[str, str]:
@@ -59,6 +60,7 @@ def compose(config: Config, components: list[ComponentScore], as_of: str) -> dic
                 "weight": round(weights.get(c.id, 0.0), 6),
                 "inverted": c.inverted,
                 "stale": c.stale or c.score is None,
+                "description": c.description_ja,
             }
         )
 

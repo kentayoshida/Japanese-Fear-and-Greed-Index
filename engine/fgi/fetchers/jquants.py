@@ -1,16 +1,20 @@
-"""J-Quants API クライアント（一次バックボーン）。仕様 §1-A / §2。
+"""J-Quants API v2 クライアント（一次バックボーン）。仕様 §1-A / §2。
+
+v2 認証（2026/6/1 に v1 廃止）：
+  - ダッシュボード発行の **APIキー**を `x-api-key` ヘッダーに載せる（1段階・トークン交換不要）
+  - APIキー自体に有効期限なし（無人運用に適する）
+  - ベースURL: https://api.jquants.com/v2
 
 認証情報は環境変数 / GitHub Secrets で渡す（コードに直書きしない §6）：
-  - JQUANTS_REFRESH_TOKEN を直接渡す、または
-  - JQUANTS_MAIL_ADDRESS + JQUANTS_PASSWORD でログインして取得
+  - 推奨: JQUANTS_API_KEY
+  - 後方互換: JQUANTS_REFRESH_TOKEN（v1 時代の名前。値が APIキーならこちらでも動く）
 
 提供エンドポイント（Phase 2/3 で使用）：
-  - 日経225オプション四本値（出来高 → #5 Put/Call レシオ）
-  - 業種別空売り比率（→ #7 空売り比率）
-  - 指数四本値（→ #1 モメンタム等の指数価格、stooq の代替）
+  - 指数四本値        : /indices/bars/daily              （→ #1 モメンタムの指数価格）
+  - 日経225オプション : /derivatives/bars/daily/options/225（出来高 → #5 Put/Call）
+  - 業種別空売り比率  : /markets/short-ratio             （→ #7 空売り比率）
 
-⚠ Phase 0 の確認事項：申込画面で「Standard プランで日経225オプション四本値が
-   取得可能」であることを最終確認すること（プラン別対応は JPX 側で変わりうる）。
+レスポンスは {"data": [...], "pagination_key": "..."} 形式。pagination_key で続きを取得。
 """
 
 from __future__ import annotations
@@ -21,133 +25,214 @@ from datetime import datetime, timezone
 import pandas as pd
 import requests
 
-DEFAULT_BASE_URL = "https://api.jquants.com/v1"
+DEFAULT_BASE_URL = "https://api.jquants.com/v2"
 
 
 class JQuantsError(RuntimeError):
     pass
 
 
+def _api_key() -> str | None:
+    return os.environ.get("JQUANTS_API_KEY") or os.environ.get("JQUANTS_REFRESH_TOKEN")
+
+
 class JQuantsClient:
-    """軽量な J-Quants クライアント。idToken をメモリにキャッシュする。"""
+    """J-Quants v2 クライアント。APIキーを x-api-key ヘッダーで送るだけ。"""
 
     def __init__(self, base_url: str | None = None, timeout: int = 30) -> None:
         self.base_url = (base_url or os.environ.get("JQUANTS_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout
-        self._id_token: str | None = None
+        self.api_key = _api_key()
 
-    # ----- 認証 -------------------------------------------------------------
     @staticmethod
     def is_configured() -> bool:
-        """認証情報が環境変数に揃っているか。揃っていなければ呼び出し側で stale 扱い。"""
-        if os.environ.get("JQUANTS_REFRESH_TOKEN"):
-            return True
-        return bool(os.environ.get("JQUANTS_MAIL_ADDRESS") and os.environ.get("JQUANTS_PASSWORD"))
+        """APIキーが環境変数にあるか。無ければ呼び出し側で stale 扱い。"""
+        return bool(_api_key())
 
-    def _refresh_token(self) -> str:
-        token = os.environ.get("JQUANTS_REFRESH_TOKEN")
-        if token:
-            return token
-        mail = os.environ.get("JQUANTS_MAIL_ADDRESS")
-        password = os.environ.get("JQUANTS_PASSWORD")
-        if not (mail and password):
+    def _headers(self) -> dict[str, str]:
+        if not self.api_key:
             raise JQuantsError(
-                "J-Quants 認証情報が未設定（JQUANTS_REFRESH_TOKEN もしくは "
-                "JQUANTS_MAIL_ADDRESS+JQUANTS_PASSWORD を設定してください）"
+                "J-Quants APIキー未設定（JQUANTS_API_KEY もしくは JQUANTS_REFRESH_TOKEN を設定）"
             )
-        resp = requests.post(
-            f"{self.base_url}/token/auth_user",
-            json={"mailaddress": mail, "password": password},
-            timeout=self.timeout,
-        )
-        resp.raise_for_status()
-        return resp.json()["refreshToken"]
-
-    def _ensure_id_token(self) -> str:
-        if self._id_token:
-            return self._id_token
-        refresh = self._refresh_token()
-        resp = requests.post(
-            f"{self.base_url}/token/auth_refresh",
-            params={"refreshtoken": refresh},
-            timeout=self.timeout,
-        )
-        resp.raise_for_status()
-        self._id_token = resp.json()["idToken"]
-        return self._id_token
+        return {"x-api-key": self.api_key}
 
     def _get(self, path: str, params: dict | None = None) -> list[dict]:
-        """ページネーション対応の GET。data 配列を連結して返す。"""
-        token = self._ensure_id_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        params = dict(params or {})
+        """data 配列をページネーション対応で取得して連結する。"""
+        headers = self._headers()
+        params = {k: v for k, v in (params or {}).items() if v is not None}
         out: list[dict] = []
-        # J-Quants はレスポンスキーがエンドポイントごとに異なるため呼び出し側で抽出
         while True:
             resp = requests.get(
                 f"{self.base_url}{path}", headers=headers, params=params, timeout=self.timeout
             )
             resp.raise_for_status()
             body = resp.json()
-            # data 本体キー（最初に見つかった list 値）を抽出
-            data_key = next((k for k, v in body.items() if isinstance(v, list)), None)
-            if data_key is not None:
-                out.extend(body[data_key])
+            data = body.get("data")
+            if data is None:
+                # 念のため：最初に見つかった list 値を data とみなす
+                data = next((v for v in body.values() if isinstance(v, list)), [])
+            out.extend(data)
             pagination = body.get("pagination_key")
             if not pagination:
                 break
             params["pagination_key"] = pagination
         return out
 
-    # ----- データ取得（Phase 2/3 実装ポイント） -----------------------------
-    def index_ohlc(self, code: str = "0000", from_date: str | None = None) -> pd.DataFrame:
-        """指数四本値。code='0000' は日経平均（TOPIX 等は別コード）。
+    # ----- データ取得 -------------------------------------------------------
+    @staticmethod
+    def _find_col(columns, *candidates: str) -> str | None:
+        """候補名（完全一致→小文字一致→部分一致）でカラムを探す。v2 の表記揺れに頑健化。"""
+        cols = list(columns)
+        lower = {c.lower(): c for c in cols}
+        for cand in candidates:
+            if cand in cols:
+                return cand
+            if cand.lower() in lower:
+                return lower[cand.lower()]
+        for cand in candidates:
+            for c in cols:
+                if cand.lower() in c.lower():
+                    return c
+        return None
 
-        返り値: DatetimeIndex の DataFrame[Open, High, Low, Close]。
-        ※ 実際のエンドポイント/コード体系は契約後の API ドキュメントで確認すること。
+    def index_close(self, code: str = "0000", from_date: str | None = None,
+                    to_date: str | None = None) -> pd.Series:
+        """指数終値系列。code='0000' は日経平均（#1 モメンタムの素材）。
+
+        /indices/bars/daily から取得。Date と Close を頑健に検出して Series を返す。
         """
-        params = {"code": code}
-        if from_date:
-            params["from"] = from_date
-        rows = self._get("/indices", params)
+        rows = self._get("/indices/bars/daily", {"code": code, "from": from_date, "to": to_date})
         if not rows:
-            raise JQuantsError(f"index_ohlc: no data for code={code}")
+            raise JQuantsError(f"index_close: no data for code={code}")
         df = pd.DataFrame(rows)
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.set_index("Date").sort_index()
-        rename = {"Open": "Open", "High": "High", "Low": "Low", "Close": "Close"}
-        return df.rename(columns=rename)[["Open", "High", "Low", "Close"]].astype(float)
+        date_col = self._find_col(df.columns, "Date")
+        # v2 の指数四本値は OHLC が略記（O/H/L/C）。Close/C/AdjustmentClose の順で検出。
+        close_col = self._find_col(df.columns, "Close", "C", "AdjustmentClose")
+        if not date_col or not close_col:
+            raise JQuantsError(
+                f"index_close: Date/Close 列が見つからない columns={list(df.columns)}"
+            )
+        s = pd.Series(
+            pd.to_numeric(df[close_col], errors="coerce").values,
+            index=pd.to_datetime(df[date_col]),
+        ).dropna().sort_index()
+        return s
 
-    def index_option_ohlc(self, date: str) -> pd.DataFrame:
+    def listed_codes_by_market(self, market_name: str | None = None) -> set[str]:
+        """上場銘柄コード集合。market_name（例 'プライム'）指定でその市場区分に限定。"""
+        rows = self._get("/equities/master", {})
+        if not rows:
+            raise JQuantsError("listed_codes_by_market: no data")
+        df = pd.DataFrame(rows)
+        code_col = self._find_col(df.columns, "Code")
+        if market_name:
+            mkt_col = self._find_col(df.columns, "MktNm", "MarketName")
+            if not mkt_col:
+                raise JQuantsError(f"master: 市場名列が無い columns={list(df.columns)}")
+            df = df[df[mkt_col].astype(str) == market_name]
+        return set(df[code_col].astype(str))
+
+    def equities_close_by_date(self, date: str) -> pd.Series:
+        """指定日の全銘柄の調整後終値（index=銘柄コード）。#2/#3 の集計素材。"""
+        rows = self._get("/equities/bars/daily", {"date": date})
+        if not rows:
+            return pd.Series(dtype="float64")  # 休場日など
+        df = pd.DataFrame(rows)
+        code_col = self._find_col(df.columns, "Code")
+        close_col = self._find_col(df.columns, "AdjC", "AdjustmentClose", "Close", "C")
+        s = pd.Series(
+            pd.to_numeric(df[close_col], errors="coerce").values, index=df[code_col].astype(str)
+        ).dropna()
+        return s
+
+    def equity_adj_close(self, code: str, from_date: str | None = None,
+                         to_date: str | None = None) -> pd.Series:
+        """個別銘柄/ETF の調整後終値（AdjC）系列。#8 の債券レッグ（国債ETF）等に使う。
+
+        /equities/bars/daily から取得。調整後終値はトータルリターン近似（分配・分割調整済み）。
+        """
+        rows = self._get("/equities/bars/daily", {"code": code, "from": from_date, "to": to_date})
+        if not rows:
+            raise JQuantsError(f"equity_adj_close: no data for code={code}")
+        df = pd.DataFrame(rows)
+        date_col = self._find_col(df.columns, "Date")
+        # 調整後終値を優先（AdjC）。無ければ素の終値。
+        close_col = self._find_col(df.columns, "AdjC", "AdjustmentClose", "Close", "C")
+        if not date_col or not close_col:
+            raise JQuantsError(
+                f"equity_adj_close: Date/AdjC 列が見つからない columns={list(df.columns)}"
+            )
+        s = pd.Series(
+            pd.to_numeric(df[close_col], errors="coerce").values,
+            index=pd.to_datetime(df[date_col]),
+        ).dropna().sort_index()
+        return s
+
+    def index_option_chain(self, date: str) -> pd.DataFrame:
         """日経225オプション四本値（指定日・全ストライク）。#5 Put/Call の素材。
 
-        返り値: DataFrame（PutCallDivision/StrikePrice/Volume 等を含む）。
-        ※ カラム名は契約後 API ドキュメントに合わせて調整すること。
+        /derivatives/bars/daily/options/225 から取得。
+        ※ 出来高カラム名・PutCallDivision の値は実レスポンスで確認のうえ derive 側で扱う。
         """
-        rows = self._get("/option/index_option", {"date": date})
+        rows = self._get("/derivatives/bars/daily/options/225", {"date": date})
         if not rows:
-            raise JQuantsError(f"index_option_ohlc: no data for date={date}")
+            raise JQuantsError(f"index_option_chain: no data for date={date}")
         return pd.DataFrame(rows)
 
-    def short_selling_ratio(self, from_date: str | None = None) -> pd.DataFrame:
-        """業種別空売り比率。#7 空売り比率の素材。
+    def _discover_short_sectors(self) -> list[str]:
+        """直近の営業日から空売り比率の業種コード(S33)一覧を取得する。"""
+        from datetime import datetime, timedelta, timezone as _tz
 
-        返り値: DatetimeIndex の DataFrame。市場全体値が必要なら集計するか
-        東証集計で補完する（§2）。
-        ※ カラム名は契約後 API ドキュメントに合わせて調整すること。
+        jst_now = datetime.now(_tz.utc) + timedelta(hours=9)
+        for back in range(1, 10):
+            day = jst_now - timedelta(days=back)
+            if day.weekday() >= 5:
+                continue
+            rows = self._get("/markets/short-ratio", {"date": day.strftime("%Y-%m-%d")})
+            if rows:
+                return sorted({str(r["S33"]) for r in rows if "S33" in r})
+        raise JQuantsError("short-ratio: 業種コードの探索に失敗")
+
+    def weekly_margin_long_total(self, date: str) -> float | None:
+        """#6案A：指定週の市場全体の信用買い残（LongVol の全銘柄合算, 総株数）。
+
+        /markets/margin-interest（週次信用取引残高・銘柄別。Date は原則金曜）を date 指定で
+        全銘柄ぶん取得し LongVol を合算する。該当日の発表が無ければ None を返す
+        （祝日で記録日が金曜からずれる週は呼び出し側で前営業日を試す）。
+
+        ※ プローブで /markets/margin-interest は 400（要パラメータ）＝存在を確認済み。
+          他候補（weekly-margin-interest 等）は 403 で不可。
         """
-        params = {}
-        if from_date:
-            params["from"] = from_date
-        rows = self._get("/markets/short_selling", params)
+        rows = self._get("/markets/margin-interest", {"date": date})
         if not rows:
-            raise JQuantsError("short_selling_ratio: no data")
+            return None
         df = pd.DataFrame(rows)
-        df["Date"] = pd.to_datetime(df["Date"])
-        return df.set_index("Date").sort_index()
+        long_col = self._find_col(
+            df.columns, "LongVol", "LongMarginTradeVolume", "LongStdVol"
+        )
+        if not long_col:
+            raise JQuantsError(
+                f"weekly_margin: 信用買い残(LongVol) 列が無い columns={list(df.columns)}"
+            )
+        return float(pd.to_numeric(df[long_col], errors="coerce").fillna(0.0).sum())
+
+    def short_ratio_market_df(self, from_date: str, to_date: str | None = None) -> pd.DataFrame:
+        """市場全体の空売り比率算出用に、全業種×期間レンジの行を取得して連結する。
+
+        /markets/short-ratio は from/to を s33 指定時のみ受け付けるため、業種ごとに
+        レンジ取得して縦結合する（業種数ぶんの呼び出し＝約34回）。
+        """
+        sectors = self._discover_short_sectors()
+        frames: list[pd.DataFrame] = []
+        for s33 in sectors:
+            rows = self._get("/markets/short-ratio", {"s33": s33, "from": from_date, "to": to_date})
+            if rows:
+                frames.append(pd.DataFrame(rows))
+        if not frames:
+            raise JQuantsError("short_ratio_market_df: no data")
+        return pd.concat(frames, ignore_index=True)
 
 
 def now_jst_date() -> str:
-    """JST の本日日付（YYYY-MM-DD）。cron 実行のデフォルト基準日に使う。"""
-    jst = timezone.utc  # 実運用では ZoneInfo("Asia/Tokyo") を使用（CI の TZ 設定でも可）
-    return datetime.now(jst).strftime("%Y-%m-%d")
+    """JST の本日日付（YYYY-MM-DD）。"""
+    return datetime.now(timezone.utc).astimezone(timezone(__import__("datetime").timedelta(hours=9))).strftime("%Y-%m-%d")

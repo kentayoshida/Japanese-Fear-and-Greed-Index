@@ -38,11 +38,13 @@ dimensions:
 # inverted: true の指標は正規化後に score = 100 - score（Fear寄りを反転）。
 indicators:
   - id: momentum_125dma
-    label_ja: "日経225 vs 125日線乖離率"
+    label_ja: "TOPIX vs 125日線乖離率"
     dimension: momentum
     method: percentile
     inverted: false
-    description_ja: "日経平均が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
+    # ※ J-Quants は日経225を配信しないため、株式指数は TOPIX(code 0000)を使用（Ken確認・決定A）。
+    #   日経225版は別途 stooq 等で追加予定。
+    description_ja: "TOPIX が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。"
 
   - id: advance_decline_25
     label_ja: "騰落レシオ（東証プライム・25日）"
@@ -95,7 +97,33 @@ indicators:
     dimension: safe_haven
     method: percentile
     inverted: false
-    description_ja: "日経225と10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
+    description_ja: "TOPIXと10年JGBトータルリターンの20日リターン差。株式優位なら強気。"
+
+# -----------------------------------------------------------------------------
+# 版（バリアント）
+# 株式指数レッグ（#1 モメンタム・#8 セーフヘイブンの株式側）を差し替えて
+# 複数版を同時出力する。市場全体系の指標（#2 騰落・#3 新高安・#4 日経VI・
+# #5 P/C・#6 信用評価損益率・#7 空売り）は全版で共通。
+#   default: true の版は latest.json / history.json も兼ねる（後方互換）。
+#   各版は latest.<key>.json / history.<key>.json に出力し、variants.json に一覧を書く。
+# equity.min/max は指数価格の異常値検知レンジ（版ごとに水準が違うため個別指定）。
+# -----------------------------------------------------------------------------
+variants:
+  - key: topix
+    label_ja: "TOPIX"
+    default: true
+    equity: { source: jquants, code: "0000", label_ja: "TOPIX", min: 300, max: 20000 }
+  - key: nikkei225
+    label_ja: "日経225"
+    # J-Quants は日経225を非配信のため日経公式の日次CSV（VIと同ドメイン・実績あり）を使用。
+    # stooq(^nkx) は 404/クローキングで不安定のため不採用（Ken決定A）。
+    equity:
+      source: nikkei_csv
+      csv_url: "https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_daily_jp.csv"
+      encoding: cp932
+      label_ja: "日経225"
+      min: 3000
+      max: 200000
 
 # -----------------------------------------------------------------------------
 # 出力設定
@@ -111,9 +139,15 @@ output:
 # -----------------------------------------------------------------------------
 sources:
   jquants:
-    enabled: false   # J-Quants 契約・APIキー発行後に true へ（Phase 2）
-    base_url: "https://api.jquants.com/v1"
+    enabled: true    # v2 APIキー方式。Secrets に JQUANTS_API_KEY（または JQUANTS_REFRESH_TOKEN）を設定
+    base_url: "https://api.jquants.com/v2"
     cache_dir: "data/cache/jquants"
+    equity_index_code: "0000"   # 株式現物指数 = TOPIX（#1モメンタム・#8株式レッグ）
+    bond_etf_code: "2510"       # #8 債券レッグ＝国債ETF（NOMURA-BPI総合連動）。10年寄りに変更可
   stooq:
-    nikkei_symbol: "^nkx"   # 日経225（stooq 表記）
+    nikkei_symbol: "^nkx"        # 日経225（stooq 表記。日経225版で使用）
     cache_dir: "data/cache/stooq"
+  nikkei_vi:
+    # #4 日経VI（J-Quants は N145 非配信、stooq にも該当なし）。日経公式の日次CSVを使用。
+    csv_url: "https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv"
+    encoding: "cp932"

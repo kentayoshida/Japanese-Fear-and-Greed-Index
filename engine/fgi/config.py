@@ -42,6 +42,15 @@ class Indicator:
 
 
 @dataclass(frozen=True)
+class Variant:
+    """出力版。株式指数レッグ(#1,#8)だけが版ごとに変わる。"""
+    key: str
+    label_ja: str
+    equity: dict[str, Any]
+    default: bool = False
+
+
+@dataclass(frozen=True)
 class Config:
     lookback_days: int
     bands: list[Band]
@@ -49,12 +58,19 @@ class Config:
     indicators: list[Indicator]
     output: dict[str, str]
     sources: dict[str, Any] = field(default_factory=dict)
+    variants: list[Variant] = field(default_factory=list)
 
     def indicator(self, indicator_id: str) -> Indicator:
         for ind in self.indicators:
             if ind.id == indicator_id:
                 return ind
         raise KeyError(f"unknown indicator: {indicator_id}")
+
+    def default_variant(self) -> Variant:
+        for v in self.variants:
+            if v.default:
+                return v
+        return self.variants[0]
 
 
 def load_config(path: str | Path | None = None) -> Config:
@@ -91,11 +107,62 @@ def load_config(path: str | Path | None = None) -> Config:
         if ind.method == "anchor" and not ind.anchors:
             raise ValueError(f"indicator '{ind.id}' uses method=anchor but has no anchors")
 
+    sources = raw.get("sources", {})
+
+    # 版（variants）。未指定なら sources.jquants の指数を使う単一の topix 版を既定生成。
+    raw_variants = raw.get("variants")
+    if raw_variants:
+        variants = [
+            Variant(
+                key=v["key"],
+                label_ja=v.get("label_ja", v["key"]),
+                equity=dict(v.get("equity", {})),
+                default=bool(v.get("default", False)),
+            )
+            for v in raw_variants
+        ]
+    else:
+        code = sources.get("jquants", {}).get("equity_index_code", "0000")
+        variants = [Variant(key="topix", label_ja="TOPIX", default=True,
+                            equity={"source": "jquants", "code": code, "label_ja": "TOPIX",
+                                    "min": 300, "max": 20000})]
+    if not any(v.default for v in variants):
+        variants = [Variant(**{**v.__dict__, "default": (i == 0)})
+                    for i, v in enumerate(variants)]
+
     return Config(
         lookback_days=int(raw["lookback_days"]),
         bands=bands,
         dimensions=dimensions,
         indicators=indicators,
         output=raw.get("output", {}),
-        sources=raw.get("sources", {}),
+        sources=sources,
+        variants=variants,
     )
+
+
+def variant_config(config: Config, variant: Variant) -> Config:
+    """版に応じて #1/#8 のラベル・説明を株式指数名で差し替えた Config を返す。
+
+    正規化方式・lookback・加重・アンカーは全版共通。ラベルだけを版仕様にする。
+    """
+    from dataclasses import replace
+
+    eq_label = variant.equity.get("label_ja", variant.key)
+    new_inds: list[Indicator] = []
+    for ind in config.indicators:
+        if ind.id == "momentum_125dma":
+            new_inds.append(replace(
+                ind,
+                label_ja=f"{eq_label} vs 125日線乖離率",
+                description_ja=f"{eq_label} が125日移動平均からどれだけ上方/下方に乖離しているか。上方乖離は強気。",
+            ))
+        elif ind.id == "safe_haven":
+            new_inds.append(replace(
+                ind,
+                label_ja=f"セーフヘイブン需要（{eq_label} − 債券 20日リターン差）",
+                description_ja=f"{eq_label}と10年JGBトータルリターンの20日リターン差。株式優位なら強気。",
+            ))
+        else:
+            new_inds.append(ind)
+    return replace(config, indicators=new_inds)

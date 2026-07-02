@@ -22,6 +22,7 @@ def _component_for_date(
         return ComponentScore(
             id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,
             raw=None, score=None, inverted=ind.inverted, stale=True,
+            description_ja=ind.description_ja,
         )
 
     window = ser.as_of(date).dropna()
@@ -29,6 +30,7 @@ def _component_for_date(
         return ComponentScore(
             id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,
             raw=None, score=None, inverted=ind.inverted, stale=True,
+            description_ja=ind.description_ja,
         )
 
     history = list(window.values)
@@ -45,11 +47,13 @@ def _component_for_date(
         return ComponentScore(
             id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,
             raw=raw, score=None, inverted=ind.inverted, stale=True,
+            description_ja=ind.description_ja,
         )
 
     return ComponentScore(
         id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,
         raw=raw, score=score, inverted=ind.inverted, stale=False,
+        description_ja=ind.description_ja,
     )
 
 
