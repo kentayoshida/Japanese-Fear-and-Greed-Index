@@ -59,7 +59,19 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add web/public/data
             git commit -m "chore(data): 日次スコア再生成 ($(date +%Y-%m-%d))"
-            git push
+            # 並行実行やブランチ更新で push が弾かれる場合に備え、rebase + リトライ。
+            branch="${GITHUB_REF_NAME}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin "HEAD:${branch}"; then
+                echo "push 成功（試行 ${attempt}）"; exit 0
+              fi
+              echo "push 失敗（試行 ${attempt}）。fetch + rebase して再試行します。"
+              git fetch origin "${branch}"
+              git rebase "origin/${branch}" || { git rebase --abort; exit 1; }
+              sleep $((attempt * 2))
+            done
+            echo "push を複数回試行しましたが失敗しました。" >&2
+            exit 1
           else
             echo "変更なし。コミットをスキップします。"
           fi

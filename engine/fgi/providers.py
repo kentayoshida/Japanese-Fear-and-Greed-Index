@@ -324,26 +324,100 @@ def _provide_advance_decline(config: Config, client, series: dict, errors: dict)
         errors["advance_decline_25"] = f"advance_decline_25: {exc}"
 
 
-def _provide_margin_pl(config: Config, series: dict, errors: dict) -> None:
-    """#6 信用評価損益率（買い方）：松井『投資指標(店内)』を Playwright で取得し、
-    日次値を CSV に蓄積（前営業日値・anchor 正規化のため最新値が主眼）。"""
+def _weekly_margin_long_cache(config: Config, client) -> pd.Series:
+    """#6案A素材：市場全体の週次信用買い残（LongVol 合算）を金曜ベースで増分キャッシュ。
+
+    /markets/margin-interest は date（原則金曜）指定で全銘柄を返すため、1週=1呼び出し。
+    1実行あたり max_new 週ぶんだけ過去に遡って積み増す（初回は数回で充填）。
+    祝日で記録日が金曜からずれる週は前営業日を数日戻って試す。
+    """
     from datetime import datetime, timedelta
 
+    path = _series_cache_path(config, "weekly_margin_long")
+    cached = _load_series_cache(path)
+    jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
+    # MTM の建値推定に十分な履歴（正規化窓 lookback + 助走）を金曜系列で確保
+    start = jst_today - timedelta(days=int(config.lookback_days * 3) + 60)
+    fridays = pd.date_range(start=start, end=jst_today, freq="W-FRI")
+    have = {d.normalize() for d in cached.index}
+    missing = [d for d in fridays if d.normalize() not in have]
+    max_new = int(os.environ.get("JQUANTS_WM_MAX_FETCH", "12"))
+    new: dict[pd.Timestamp, float] = {}
+    for fri in missing[-max_new:]:  # 直近の未取得週から積み増す
+        for back in range(0, 4):  # 金→木→水→火（祝日ずれ吸収）
+            day = fri - pd.Timedelta(days=back)
+            try:
+                total = client.weekly_margin_long_total(day.strftime("%Y-%m-%d"))
+            except Exception:  # noqa: BLE001
+                total = None
+            if total:
+                new[pd.Timestamp(fri.date())] = float(total)
+                break
+    merged = cached
+    if new:
+        merged = pd.concat([cached, pd.Series(new)]).sort_index()
+        merged = merged[~merged.index.duplicated(keep="last")]
+        _save_series_cache(path, merged)
+    return merged
+
+
+def _provide_margin_pl(config: Config, client, series: dict, errors: dict) -> None:
+    """#6 信用評価損益率（買い方）。仕様 §2 の三層構成：
+      tier-1: 松井『投資指標(店内)』を Playwright で取得（正・最新営業日のみ）
+      tier-2: 週次信用買い残 × 指数の在庫平均コスト MTM 近似（過去日を日次補完）
+      tier-3: 重複日で tier-2 を tier-1 にオフセット較正し、観測日は実測で上書き
+    松井が取れなくても MTM で継続、MTM が組めなくても松井のみで継続する。"""
+    from datetime import datetime, timedelta
+
+    from .fetchers.derive import margin_pl_mtm
+
+    # --- tier-1: 松井（正）。取得できたら observed 系列(margin_pl_ratio.csv)に蓄積 ---
+    matsui_path = _series_cache_path(config, "margin_pl_ratio")
+    matsui = _load_series_cache(matsui_path)
     try:
         from .fetchers.matsui import fetch_margin_pl_buy
 
         value = fetch_margin_pl_buy()
         as_of = pd.Timestamp((datetime.utcnow() + timedelta(hours=9)).date())
-        path = _series_cache_path(config, "margin_pl_ratio")
-        cached = _load_series_cache(path)
-        merged = pd.concat([cached, pd.Series({as_of: float(value)})]).sort_index()
-        merged = merged[~merged.index.duplicated(keep="last")]
-        _save_series_cache(path, merged)
-        series["margin_pl_ratio"] = IndicatorSeries("margin_pl_ratio", merged, "matsui")
-    except FetchError as exc:
-        errors["margin_pl_ratio"] = str(exc)
-    except Exception as exc:  # noqa: BLE001
-        errors["margin_pl_ratio"] = f"margin_pl_ratio: {exc}"
+        matsui = pd.concat([matsui, pd.Series({as_of: float(value)})]).sort_index()
+        matsui = matsui[~matsui.index.duplicated(keep="last")]
+        _save_series_cache(matsui_path, matsui)
+    except Exception as exc:  # noqa: BLE001  松井不通でも tier-2 で継続
+        errors.setdefault("margin_pl_ratio_matsui", f"matsui: {exc}")
+
+    # --- tier-2: 週次買い残 × 指数の MTM 近似（J-Quants 未設定時はスキップ）---
+    mtm = None
+    if client is not None:
+        try:
+            weekly = _weekly_margin_long_cache(config, client)
+            if len(weekly) >= 2:
+                idx = _nikkei_close_real(config)
+                mtm = margin_pl_mtm(weekly, idx)
+        except Exception as exc:  # noqa: BLE001
+            errors.setdefault("margin_pl_ratio_mtm", f"mtm: {exc}")
+
+    # --- tier-3: 較正して合成（観測日は実測で上書き）---
+    final = None
+    if mtm is not None and len(mtm):
+        cal = mtm
+        if len(matsui):
+            common = mtm.index.intersection(matsui.index)
+            if len(common):
+                offset = float((matsui.reindex(common) - mtm.reindex(common)).median())
+                cal = mtm + offset
+        if len(matsui):
+            final = pd.concat([cal, matsui]).sort_index()
+            final = final[~final.index.duplicated(keep="last")]  # matsui(後勝ち)で上書き
+        else:
+            final = cal
+    elif len(matsui):
+        final = matsui  # MTM 不可なら松井のみ（従来動作）
+
+    if final is None or len(final) == 0:
+        errors["margin_pl_ratio"] = "margin_pl_ratio: 松井・MTM いずれも取得できず"
+        return
+    src = "matsui+mtm" if (mtm is not None and len(mtm)) else "matsui"
+    series["margin_pl_ratio"] = IndicatorSeries("margin_pl_ratio", final, src)
 
 
 def _provide_new_high_low(config: Config, client, series: dict, errors: dict) -> None:
@@ -428,6 +502,7 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
     _provide_nikkei_vi(config, series, errors)
 
     # ---- #5 P/Cレシオ・#7 空売り比率（J-Quants v2 一次データ）----
+    client = None
     if JQuantsClient.is_configured():
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
         _provide_put_call(config, client, series, errors)
@@ -440,8 +515,8 @@ def _provide_real(config: Config) -> dict[str, IndicatorSeries]:
                   "advance_decline_25", "new_high_low"):
             errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
-    # ---- #6 信用評価損益率（松井・Playwright。J-Quants 非依存）----
-    _provide_margin_pl(config, series, errors)
+    # ---- #6 信用評価損益率（松井 tier-1 + 週次買い残 MTM tier-2）----
+    _provide_margin_pl(config, client, series, errors)
 
     if errors:
         _provide_real.last_errors = errors  # type: ignore[attr-defined]

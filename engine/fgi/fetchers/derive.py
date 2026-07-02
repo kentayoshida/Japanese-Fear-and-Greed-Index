@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 
 
@@ -88,6 +90,52 @@ def short_selling_market_ratio(
     ratio = (short / total.replace(0, pd.NA) * 100.0).dropna()
     ratio.name = "short_selling_ratio"
     return ratio.sort_index()
+
+
+def margin_pl_mtm(weekly_long: pd.Series, index_close: pd.Series) -> pd.Series:
+    """#6案A：週次信用買い残（総株数）と指数から、在庫平均コスト法で平均建値（指数水準）を
+    推定し、指数日次終値で含み損益率(%)を日々MTMする近似（仕様 §2 三層構成の tier-2）。
+
+    週次日付ごとに、買い残の増分ぶんをその週の指数水準で平均建値に加重平均（在庫平均法）。
+    残高減少時は平均建値を据え置く。週の平均建値を日次にフォワードフィルし、
+    含み損益率 = (指数終値 / 平均建値 − 1) × 100 を日次で返す。
+
+    weekly_long: index=週次日付, value=市場全体の買い残(総株数)
+    index_close: index=日次日付, value=指数終値（TOPIX 等・版に応じた株式指数）
+    """
+    wl = pd.to_numeric(weekly_long, errors="coerce").dropna().sort_index()
+    idx = pd.to_numeric(index_close, errors="coerce").dropna().sort_index()
+    if len(wl) < 2 or len(idx) < 2:
+        raise ValueError("margin_pl_mtm: 週次残高または指数の点数が不足")
+
+    # 週次日付時点の指数水準（無ければ直近営業日にフォワードフィル）
+    idx_at_week = idx.reindex(idx.index.union(wl.index)).sort_index().ffill().reindex(wl.index)
+
+    avg_cost: dict[pd.Timestamp, float] = {}
+    prev_vol = 0.0
+    A: float | None = None
+    for d in wl.index:
+        vol = float(wl.loc[d])
+        price = idx_at_week.loc[d]
+        if price is None or (isinstance(price, float) and math.isnan(price)):
+            continue
+        d_vol = vol - prev_vol
+        if A is None:
+            A = float(price)
+        elif d_vol > 0:  # 増加ぶんを当週の指数水準で建値に加重平均
+            A = (A * prev_vol + float(price) * d_vol) / (prev_vol + d_vol)
+        # d_vol <= 0（残高減少）は平均建値を据え置き
+        avg_cost[d] = A
+        prev_vol = vol
+
+    if not avg_cost:
+        raise ValueError("margin_pl_mtm: 平均建値を推定できず")
+    wc = pd.Series(avg_cost).sort_index()
+    # 週次平均建値を日次にフォワードフィルし、指数でMTM
+    a_daily = wc.reindex(idx.index.union(wc.index)).sort_index().ffill().reindex(idx.index)
+    pl = (idx / a_daily - 1.0) * 100.0
+    pl.name = "margin_pl_ratio_mtm"
+    return pl.dropna()
 
 
 def safe_haven(nikkei_close: pd.Series, bond_total_return: pd.Series, window: int = 20) -> pd.Series:

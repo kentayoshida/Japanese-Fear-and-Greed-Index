@@ -193,6 +193,29 @@ class JQuantsClient:
                 return sorted({str(r["S33"]) for r in rows if "S33" in r})
         raise JQuantsError("short-ratio: 業種コードの探索に失敗")
 
+    def weekly_margin_long_total(self, date: str) -> float | None:
+        """#6案A：指定週の市場全体の信用買い残（LongVol の全銘柄合算, 総株数）。
+
+        /markets/margin-interest（週次信用取引残高・銘柄別。Date は原則金曜）を date 指定で
+        全銘柄ぶん取得し LongVol を合算する。該当日の発表が無ければ None を返す
+        （祝日で記録日が金曜からずれる週は呼び出し側で前営業日を試す）。
+
+        ※ プローブで /markets/margin-interest は 400（要パラメータ）＝存在を確認済み。
+          他候補（weekly-margin-interest 等）は 403 で不可。
+        """
+        rows = self._get("/markets/margin-interest", {"date": date})
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        long_col = self._find_col(
+            df.columns, "LongVol", "LongMarginTradeVolume", "LongStdVol"
+        )
+        if not long_col:
+            raise JQuantsError(
+                f"weekly_margin: 信用買い残(LongVol) 列が無い columns={list(df.columns)}"
+            )
+        return float(pd.to_numeric(df[long_col], errors="coerce").fillna(0.0).sum())
+
     def short_ratio_market_df(self, from_date: str, to_date: str | None = None) -> pd.DataFrame:
         """市場全体の空売り比率算出用に、全業種×期間レンジの行を取得して連結する。
 

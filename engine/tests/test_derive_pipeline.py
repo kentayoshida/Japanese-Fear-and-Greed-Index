@@ -5,6 +5,7 @@ from fgi.config import load_config
 from fgi.fetchers.base import IndicatorSeries
 from fgi.fetchers.derive import (
     advance_decline_ratio,
+    margin_pl_mtm,
     momentum_125dma,
     new_high_low_net,
     put_call_ratio,
@@ -81,6 +82,30 @@ def test_safe_haven_equity_outperform():
     bd = pd.Series(np.linspace(100, 101, 40), index=d)   # 債券ほぼ横ばい
     sh = safe_haven(eq, bd, window=20)
     assert sh.iloc[-1] > 0  # 株式優位
+
+
+def test_margin_pl_mtm_rising_index_positive():
+    # 建値一定の週次残高 + 上昇する指数 → 含み益（正）で MTM される。
+    weeks = pd.date_range("2024-01-05", periods=6, freq="W-FRI")
+    weekly_long = pd.Series([1000.0] * 6, index=weeks)  # 残高一定＝建値は初週水準に固定
+    d = pd.bdate_range("2024-01-01", periods=60)
+    idx = pd.Series(np.linspace(100.0, 120.0, 60), index=d)  # +20% 上昇
+    pl = margin_pl_mtm(weekly_long, idx)
+    assert pl.iloc[-1] > 0  # 指数上昇 → 買い方は含み益
+    # 建値は初週(≈100)付近、最終指数120 → おおむね +20% 近辺
+    assert 10.0 < pl.iloc[-1] < 30.0
+
+
+def test_margin_pl_mtm_weighted_entry_on_additions():
+    # 高値圏で買い増すと平均建値が上がり、同一指数でも含み損益が下がる。
+    weeks = pd.date_range("2024-01-05", periods=4, freq="W-FRI")
+    d = pd.bdate_range("2024-01-01", periods=40)
+    idx = pd.Series(np.linspace(100.0, 130.0, 40), index=d)
+    flat = pd.Series([1000.0, 1000.0, 1000.0, 1000.0], index=weeks)  # 買い増しなし
+    added = pd.Series([1000.0, 1000.0, 2000.0, 3000.0], index=weeks)  # 高値で買い増し
+    pl_flat = margin_pl_mtm(flat, idx).iloc[-1]
+    pl_added = margin_pl_mtm(added, idx).iloc[-1]
+    assert pl_added < pl_flat  # 高値買い増しで建値上昇 → 含み損益は縮小
 
 
 def test_point_in_time_no_lookahead():
