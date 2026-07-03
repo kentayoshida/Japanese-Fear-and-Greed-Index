@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import "./design-tokens.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

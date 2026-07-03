@@ -9,7 +9,6 @@ import GuideView from "@/components/GuideView";
 import { Latest, HistoryPoint, VariantInfo, VariantsManifest } from "@/lib/fgi";
 
 // 静的 JSON は GitHub Actions の日次 cron が再生成・コミットする。
-// クライアントから取得するため、再デプロイ後に最新値が反映される。
 async function loadJson<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`${path}: ${res.status}`);
@@ -19,10 +18,15 @@ async function loadJson<T>(path: string): Promise<T> {
 // レガシー（マニフェスト未生成）を表す擬似キー。latest.json/history.json を読む。
 const LEGACY = "__legacy__";
 
-type View = "dashboard" | "guide";
+type View = "overview" | "timeline" | "guide";
+const NAV: { key: View; label: string }[] = [
+  { key: "overview", label: "概要" },
+  { key: "timeline", label: "推移" },
+  { key: "guide", label: "解説" },
+];
 
 export default function Page() {
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("overview");
   const [variants, setVariants] = useState<VariantInfo[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [latest, setLatest] = useState<Latest | null>(null);
@@ -62,24 +66,19 @@ export default function Page() {
 
   const topnav = (
     <nav className="topnav" aria-label="ビュー切り替え">
-      <div className="topnav__brand">日本版 Fear &amp; Greed Index</div>
+      <div className="topnav__brand">恐怖と強欲指数</div>
       <div className="topnav__tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={view === "dashboard"}
-          className={`topnav__tab${view === "dashboard" ? " is-active" : ""}`}
-          onClick={() => setView("dashboard")}
-        >
-          ダッシュボード
-        </button>
-        <button
-          role="tab"
-          aria-selected={view === "guide"}
-          className={`topnav__tab${view === "guide" ? " is-active" : ""}`}
-          onClick={() => setView("guide")}
-        >
-          指標の解説
-        </button>
+        {NAV.map((n) => (
+          <button
+            key={n.key}
+            role="tab"
+            aria-selected={view === n.key}
+            className={`topnav__tab${view === n.key ? " is-active" : ""}`}
+            onClick={() => setView(n.key)}
+          >
+            {n.label}
+          </button>
+        ))}
       </div>
     </nav>
   );
@@ -115,10 +114,8 @@ export default function Page() {
     <main className="page">
       {topnav}
       <header className="hero">
+        <div className="hero__eyebrow">恐怖と強欲指数（日本株版）</div>
         <h1 className="hero__title">いま市場を動かしている感情は？</h1>
-        <p className="hero__sub">
-          日本株式市場の投資家心理を8つの指標から 0〜100 の単一スコアに合成しています。
-        </p>
 
         {variants.length > 1 && (
           <div className="variant-tabs" role="tablist" aria-label="指数版の切り替え">
@@ -142,49 +139,54 @@ export default function Page() {
           </div>
         )}
 
-        <Gauge score={latest.score} />
-
-        <div className="hero__meta">
-          <span>基準日 {latest.as_of}</span>
-          <span className="dot">•</span>
-          <span>
-            採用指標 {latest.coverage}/{latest.n_indicators}
-          </span>
-          {typeof latest.index_value === "number" && latest.index_label && (
-            <>
+        {view === "overview" && (
+          <>
+            <Gauge score={latest.score} />
+            <div className="hero__meta">
+              <span>基準日 {latest.as_of}</span>
               <span className="dot">•</span>
-              <span>
-                {latest.index_label}{" "}
-                {latest.index_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-              </span>
-            </>
-          )}
-          {latest.generated_at && (
-            <>
-              <span className="dot">•</span>
-              <span>最終更新 {new Date(latest.generated_at).toLocaleString("ja-JP")}</span>
-            </>
-          )}
-        </div>
+              <span>採用指標 {latest.coverage}/{latest.n_indicators}</span>
+              {typeof latest.index_value === "number" && latest.index_label && (
+                <>
+                  <span className="dot">•</span>
+                  <span>
+                    {latest.index_label}{" "}
+                    {latest.index_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </span>
+                </>
+              )}
+              {latest.generated_at && (
+                <>
+                  <span className="dot">•</span>
+                  <span>最終更新 {new Date(latest.generated_at).toLocaleString("ja-JP")}</span>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </header>
 
-      <section className="section">
-        <h2 className="section-title">時点比較</h2>
-        <ComparisonStrip history={history} />
-      </section>
+      {view === "overview" ? (
+        <>
+          <section className="section">
+            <h2 className="section-title">時点比較</h2>
+            <ComparisonStrip history={history} />
+          </section>
 
-      <section className="section">
-        <HistoryChart history={history} indexLabel={latest.index_label} />
-      </section>
-
-      <section className="section">
-        <h2 className="section-title">指標の内訳</h2>
-        <div className="indicator-grid">
-          {latest.components.map((c) => (
-            <IndicatorCard key={c.id} c={c} generatedAt={latest.generated_at} />
-          ))}
-        </div>
-      </section>
+          <section className="section">
+            <h2 className="section-title">{latest.n_indicators}個の構成指標</h2>
+            <div className="indicator-grid">
+              {latest.components.map((c) => (
+                <IndicatorCard key={c.id} c={c} generatedAt={latest.generated_at} />
+              ))}
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className="section">
+          <HistoryChart history={history} indexLabel={latest.index_label} />
+        </section>
+      )}
 
       <footer className="footer">
         <p className="disclaimer">
@@ -192,7 +194,9 @@ export default function Page() {
             "本指標は情報提供目的の自作指標であり、投資助言ではありません。"}
         </p>
         {latest.generated_at && (
-          <p className="footer__gen">最終更新: {new Date(latest.generated_at).toLocaleString("ja-JP")}</p>
+          <p className="footer__gen">
+            最終更新: {new Date(latest.generated_at).toLocaleString("ja-JP")}
+          </p>
         )}
       </footer>
     </main>
