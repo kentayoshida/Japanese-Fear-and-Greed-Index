@@ -1,13 +1,13 @@
 {
   "variants": [
     {
-      "key": "topix",
-      "label_ja": "TOPIX",
+      "key": "nikkei225",
+      "label_ja": "日経225",
       "default": true
     },
     {
-      "key": "nikkei225",
-      "label_ja": "日経225",
+      "key": "topix",
+      "label_ja": "TOPIX",
       "default": false
     }
   ],

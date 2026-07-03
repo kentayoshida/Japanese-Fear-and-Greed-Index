@@ -229,6 +229,7 @@ html, body {
 .badge { border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; font-weight: 700; font-size: 11px; }
 .badge--stale { color: var(--zone-fear); border-color: var(--zone-fear); }
 .indicator-card__raw, .indicator-card__weight { font-variant-numeric: tabular-nums; }
+.indicator-card__asof, .indicator-card__fetched { font-variant-numeric: tabular-nums; color: var(--muted); }
 .indicator-card__desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
 
 /* ---------- Footer / states ---------- */

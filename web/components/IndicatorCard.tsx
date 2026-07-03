@@ -46,8 +46,28 @@ function MiniBar({ score }: { score: number | null }) {
   );
 }
 
-export default function IndicatorCard({ c }: { c: Component }) {
+function formatFetched(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function IndicatorCard({
+  c,
+  generatedAt,
+}: {
+  c: Component;
+  generatedAt?: string;
+}) {
   const lean = leanForComponent(c);
+  const fetched = formatFetched(generatedAt);
   return (
     <div className={`indicator-card ${c.stale ? "is-stale" : ""}`}>
       <div className="indicator-card__top">
@@ -80,6 +100,8 @@ export default function IndicatorCard({ c }: { c: Component }) {
           生値: {c.raw !== null ? c.raw.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
         </span>
         <span className="indicator-card__weight">重み {(c.weight * 100).toFixed(1)}%</span>
+        {c.data_date && <span className="indicator-card__asof">基準日 {c.data_date}</span>}
+        {fetched && <span className="indicator-card__fetched">取得 {fetched}</span>}
       </div>
 
       <p className="indicator-card__desc">{c.description || DESCRIPTIONS[c.id] || ""}</p>

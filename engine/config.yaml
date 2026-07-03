@@ -109,12 +109,10 @@ indicators:
 # equity.min/max は指数価格の異常値検知レンジ（版ごとに水準が違うため個別指定）。
 # -----------------------------------------------------------------------------
 variants:
-  - key: topix
-    label_ja: "TOPIX"
-    default: true
-    equity: { source: jquants, code: "0000", label_ja: "TOPIX", min: 300, max: 20000 }
+  # 左（初期表示）＝日経225版、右＝TOPIX版（default:true の版が初期表示）。
   - key: nikkei225
     label_ja: "日経225"
+    default: true
     # J-Quants は日経225を非配信のため日経公式の日次CSV（VIと同ドメイン・実績あり）を使用。
     # stooq(^nkx) は 404/クローキングで不安定のため不採用（Ken決定A）。
     equity:
@@ -124,6 +122,9 @@ variants:
       label_ja: "日経225"
       min: 3000
       max: 200000
+  - key: topix
+    label_ja: "TOPIX"
+    equity: { source: jquants, code: "0000", label_ja: "TOPIX", min: 300, max: 20000 }
 
 # -----------------------------------------------------------------------------
 # 出力設定
