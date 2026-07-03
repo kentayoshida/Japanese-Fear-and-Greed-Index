@@ -544,6 +544,9 @@ def _provide_real(config: Config, variant: Variant,
         dev = momentum_125dma(close)
         series["momentum_125dma"] = IndicatorSeries(
             "momentum_125dma", dev, variant.equity.get("source", "jquants"))
+        # 指数そのものの終値系列も持ち回る（チャートのオーバーレイ用。指標ではない）。
+        series["_equity_close"] = IndicatorSeries(
+            "_equity_close", close, variant.equity.get("source", "jquants"))
     except FetchError as exc:
         errors["momentum_125dma"] = str(exc)
     except Exception as exc:  # noqa: BLE001  株式指数の取得失敗で全体を落とさない
@@ -633,6 +636,9 @@ def _provide_demo(config: Config, n_days: int = 420, seed: int = 20260628) -> di
         vals = base + beta * mood
         vals = np.clip(vals, *clip)
         series[ind.id] = IndicatorSeries(ind.id, pd.Series(vals, index=dates), "demo")
+    # チャートのオーバーレイ用に合成の株価指数（mood と緩く相関する乱歩）を持たせる。
+    idx = 2800.0 * np.exp(np.cumsum(rng.normal(0.0003, 0.01, n_days)) + 0.02 * mood)
+    series["_equity_close"] = IndicatorSeries("_equity_close", pd.Series(idx, index=dates), "demo")
     return series
 
 

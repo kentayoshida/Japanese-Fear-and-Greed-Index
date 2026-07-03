@@ -54,25 +54,38 @@ export default function Gauge({ score }: { score: number | null }) {
 
   return (
     <div className="gauge">
-      <svg viewBox="0 0 400 250" role="img" aria-label={`現在のスコア ${hasScore ? Math.round(value) : "—"}（${zone.labelJa}）`}>
+      <svg viewBox="-20 0 440 250" role="img" aria-label={`現在のスコア ${hasScore ? Math.round(value) : "—"}（${zone.labelJa}）`}>
         {/* 5ゾーンのアーチ */}
         {ZONES.map((z) => (
           <path key={z.key} d={ringSectorPath(z.min, z.max)} fill={z.color} stroke="#ffffff" strokeWidth={2} />
         ))}
 
-        {/* 目盛り（0 / 25 / 45 / 55 / 75 / 100） */}
-        {[0, 25, 45, 55, 75, 100].map((t) => {
+        {/* 境界の小目盛り（25 / 45 / 55 / 75） */}
+        {[25, 45, 55, 75].map((t) => {
           const a = valueToAngle(t);
-          const p1 = polar(CX, CY, R_OUTER + 4, a);
-          const p2 = polar(CX, CY, R_OUTER + 12, a);
-          const lab = polar(CX, CY, R_OUTER + 24, a);
+          const p1 = polar(CX, CY, R_OUTER + 2, a);
+          const p2 = polar(CX, CY, R_OUTER + 9, a);
+          return <line key={t} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#c7ccd3" strokeWidth={1.5} />;
+        })}
+
+        {/* ゾーン名ラベル（本家CNN風。各ゾーン中央の角度に配置） */}
+        {ZONES.map((z) => {
+          const mid = (z.min + z.max) / 2;
+          const a = valueToAngle(mid);
+          const lab = polar(CX, CY, R_OUTER + 20, a);
           return (
-            <g key={t}>
-              <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#6b7280" strokeWidth={1.5} />
-              <text x={lab.x} y={lab.y} fontSize={11} fill="#6b7280" textAnchor="middle" dominantBaseline="middle">
-                {t}
-              </text>
-            </g>
+            <text
+              key={z.key}
+              x={lab.x}
+              y={lab.y}
+              fontSize={10}
+              fontWeight={700}
+              fill={z.color}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {z.labelJa}
+            </text>
           );
         })}
 

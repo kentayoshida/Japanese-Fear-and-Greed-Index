@@ -5,6 +5,7 @@ import Gauge from "@/components/Gauge";
 import ComparisonStrip from "@/components/ComparisonStrip";
 import HistoryChart from "@/components/HistoryChart";
 import IndicatorCard from "@/components/IndicatorCard";
+import GuideView from "@/components/GuideView";
 import { Latest, HistoryPoint, VariantInfo, VariantsManifest } from "@/lib/fgi";
 
 // 静的 JSON は GitHub Actions の日次 cron が再生成・コミットする。
@@ -18,7 +19,10 @@ async function loadJson<T>(path: string): Promise<T> {
 // レガシー（マニフェスト未生成）を表す擬似キー。latest.json/history.json を読む。
 const LEGACY = "__legacy__";
 
+type View = "dashboard" | "guide";
+
 export default function Page() {
+  const [view, setView] = useState<View>("dashboard");
   const [variants, setVariants] = useState<VariantInfo[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [latest, setLatest] = useState<Latest | null>(null);
@@ -56,9 +60,43 @@ export default function Page() {
       .catch((e) => setError(String(e)));
   }, [active]);
 
+  const topnav = (
+    <nav className="topnav" aria-label="ビュー切り替え">
+      <div className="topnav__brand">日本版 Fear &amp; Greed Index</div>
+      <div className="topnav__tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={view === "dashboard"}
+          className={`topnav__tab${view === "dashboard" ? " is-active" : ""}`}
+          onClick={() => setView("dashboard")}
+        >
+          ダッシュボード
+        </button>
+        <button
+          role="tab"
+          aria-selected={view === "guide"}
+          className={`topnav__tab${view === "guide" ? " is-active" : ""}`}
+          onClick={() => setView("guide")}
+        >
+          指標の解説
+        </button>
+      </div>
+    </nav>
+  );
+
+  if (view === "guide") {
+    return (
+      <main className="page">
+        {topnav}
+        <GuideView />
+      </main>
+    );
+  }
+
   if (error) {
     return (
       <main className="page">
+        {topnav}
         <div className="empty-state">データを読み込めませんでした。<br />{error}</div>
       </main>
     );
@@ -67,6 +105,7 @@ export default function Page() {
   if (!latest) {
     return (
       <main className="page">
+        {topnav}
         <div className="empty-state">読み込み中…</div>
       </main>
     );
@@ -74,8 +113,8 @@ export default function Page() {
 
   return (
     <main className="page">
+      {topnav}
       <header className="hero">
-        <div className="hero__eyebrow">日本版 Fear &amp; Greed Index</div>
         <h1 className="hero__title">いま市場を動かしている感情は？</h1>
         <p className="hero__sub">
           日本株式市場の投資家心理を8つの指標から 0〜100 の単一スコアに合成しています。
@@ -111,8 +150,21 @@ export default function Page() {
           <span>
             採用指標 {latest.coverage}/{latest.n_indicators}
           </span>
-          <span className="dot">•</span>
-          <span>参照期間 {latest.lookback_days}営業日</span>
+          {typeof latest.index_value === "number" && latest.index_label && (
+            <>
+              <span className="dot">•</span>
+              <span>
+                {latest.index_label}{" "}
+                {latest.index_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+            </>
+          )}
+          {latest.generated_at && (
+            <>
+              <span className="dot">•</span>
+              <span>最終更新 {new Date(latest.generated_at).toLocaleString("ja-JP")}</span>
+            </>
+          )}
         </div>
       </header>
 
@@ -122,7 +174,7 @@ export default function Page() {
       </section>
 
       <section className="section">
-        <HistoryChart history={history} />
+        <HistoryChart history={history} indexLabel={latest.index_label} />
       </section>
 
       <section className="section">

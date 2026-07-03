@@ -74,11 +74,16 @@ def build_latest(
 
 
 def build_history(
-    config: Config, raw_series: dict[str, IndicatorSeries], dates: list[pd.Timestamp]
+    config: Config,
+    raw_series: dict[str, IndicatorSeries],
+    dates: list[pd.Timestamp],
+    index_series: IndicatorSeries | None = None,
 ) -> list[dict]:
     """各日付の合成スコア時系列を返す（history.json 用）。
 
     coverage が 0 の日（全指標欠損）はスコア None になるため出力から除外する。
+    index_series（版の株価指数）を渡すと、その日時点(point-in-time)の指数終値を
+    `index` として各行に添える（チャートのオーバーレイ用）。
     """
     out: list[dict] = []
     for d in dates:
@@ -86,14 +91,17 @@ def build_history(
         result = compose(config, comps, d.strftime("%Y-%m-%d"))
         if result["score"] is None:
             continue
-        out.append(
-            {
-                "date": result["as_of"],
-                "score": result["score"],
-                "band": result["band"],
-                "coverage": result["coverage"],
-            }
-        )
+        row = {
+            "date": result["as_of"],
+            "score": result["score"],
+            "band": result["band"],
+            "coverage": result["coverage"],
+        }
+        if index_series is not None:
+            iw = index_series.as_of(d).dropna()
+            if len(iw):
+                row["index"] = round(float(iw.iloc[-1]), 2)
+        out.append(row)
     return out
 
 

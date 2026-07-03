@@ -34,6 +34,71 @@ html, body {
   padding: 32px 20px 80px;
 }
 
+/* ---------- Top nav (ダッシュボード / 解説) ---------- */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 4px 0 14px; margin-bottom: 8px; border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.topnav__brand {
+  font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: var(--text);
+}
+.topnav__tabs { display: inline-flex; gap: 4px; }
+.topnav__tab {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 14px; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+}
+.topnav__tab:hover { color: var(--text); }
+.topnav__tab.is-active { background: var(--panel-2); color: var(--text); }
+
+/* ---------- Guide (解説) ---------- */
+.guide { padding: 8px 0 0; }
+.guide__hero { text-align: center; padding: 12px 0 8px; }
+.guide__title { font-size: clamp(24px, 4.5vw, 36px); font-weight: 800; margin: 8px 0; }
+.guide__lead { color: var(--muted); max-width: 640px; margin: 0 auto; font-size: 15px; line-height: 1.8; }
+.guide__section { margin-top: 40px; }
+.guide__h2 {
+  font-size: 20px; font-weight: 800; margin: 0 0 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.guide__h2::before { content: ""; width: 4px; height: 20px; border-radius: 2px; background: var(--zone-greed); }
+.guide__p { color: var(--text); font-size: 14.5px; line-height: 1.9; margin: 0 0 12px; }
+.guide__p strong { font-weight: 800; }
+
+.guide__zones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.guide__zone {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--panel);
+  box-shadow: var(--card-shadow); font-size: 13px;
+}
+.guide__zone-swatch { width: 12px; height: 12px; border-radius: 3px; }
+.guide__zone-range { color: var(--muted); font-variant-numeric: tabular-nums; }
+.guide__zone-label { font-weight: 700; }
+
+.guide__cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.guide-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; box-shadow: var(--card-shadow);
+}
+.guide-card__head { display: flex; gap: 12px; align-items: flex-start; }
+.guide-card__no {
+  font-size: 13px; font-weight: 800; color: #fff; background: var(--ink);
+  border-radius: 8px; padding: 3px 9px; flex: none; margin-top: 2px;
+}
+.guide-card__name { font-size: 15.5px; font-weight: 800; margin: 0; line-height: 1.4; }
+.guide-card__dim { font-size: 12px; color: var(--muted); font-weight: 700; }
+.guide-card__dl { margin: 12px 0 0; }
+.guide-card__dl dt { font-size: 12px; font-weight: 800; color: var(--zone-greed); margin-top: 10px; }
+.guide-card__dl dd { margin: 3px 0 0; font-size: 13.5px; line-height: 1.7; color: var(--text); }
+
+.guide__ul, .guide__ol { margin: 0; padding-left: 22px; }
+.guide__ul li, .guide__ol li { font-size: 14.5px; line-height: 1.9; margin-bottom: 10px; color: var(--text); }
+.guide__disclaimer {
+  margin: 40px 0 0; padding: 14px 16px; border-radius: 12px;
+  background: #fdf6e3; border: 1px solid var(--zone-neutral); color: #8a6d00;
+  font-size: 13px; line-height: 1.7;
+}
+
 /* ---------- Hero ---------- */
 .hero { text-align: center; padding: 16px 0 8px; }
 .hero__eyebrow {
@@ -127,6 +192,14 @@ html, body {
 }
 .chart-tooltip__date { color: var(--muted); }
 .chart-tooltip__score { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.chart-tooltip__index { color: #3b6fb0; font-size: 12px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.chart-tooltip__cov { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.chart-note { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 10px 4px 0; }
+
+/* チャート凡例（スコア / 指数の2ライン） */
+.chart-legend { display: flex; gap: 16px; justify-content: flex-end; margin: 2px 4px 0; }
+.chart-legend__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.chart-legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 
 /* ---------- Indicator cards ---------- */
 .indicator-grid {
@@ -168,6 +241,8 @@ html, body {
 @media (max-width: 640px) {
   .compare-strip { grid-template-columns: repeat(2, 1fr); }
   .indicator-grid { grid-template-columns: 1fr; }
+  .guide__cards { grid-template-columns: 1fr; }
+  .topnav { justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

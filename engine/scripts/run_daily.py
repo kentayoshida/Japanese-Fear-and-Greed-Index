@@ -64,6 +64,9 @@ def main() -> int:
                 print(f"    - {k}: {msg}", file=sys.stderr)
             continue
 
+        # 指数オーバーレイ用の株価指数終値（指標ではないので pipeline から切り離す）
+        equity = raw_series.pop("_equity_close", None)
+
         vcfg = variant_config(config, v)
         as_of = max(s.latest_date() for s in raw_series.values())
 
@@ -72,13 +75,19 @@ def main() -> int:
         latest["mode"] = args.mode
         latest["variant"] = v.key
         latest["variant_label"] = v.label_ja
+        # チャートに重ねる指数の名称・最新値
+        latest["index_label"] = v.equity.get("label_ja", v.key)
+        if equity is not None:
+            ew = equity.as_of(as_of).dropna()
+            if len(ew):
+                latest["index_value"] = round(float(ew.iloc[-1]), 2)
         if args.mode == "demo":
             latest["sample"] = True  # 合成データであることを明示
         if errors:
             latest["fetch_errors"] = errors  # 取得不能だった指標と理由（透明性）
 
         dates = union_business_dates(raw_series, start=start)
-        history = build_history(vcfg, raw_series, dates)
+        history = build_history(vcfg, raw_series, dates, index_series=equity)
 
         # 版別ファイル
         vlatest = _variant_path(latest_base, v.key)
