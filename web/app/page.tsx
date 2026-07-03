@@ -150,8 +150,21 @@ export default function Page() {
           <span>
             採用指標 {latest.coverage}/{latest.n_indicators}
           </span>
-          <span className="dot">•</span>
-          <span>参照期間 {latest.lookback_days}営業日</span>
+          {typeof latest.index_value === "number" && latest.index_label && (
+            <>
+              <span className="dot">•</span>
+              <span>
+                {latest.index_label}{" "}
+                {latest.index_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+            </>
+          )}
+          {latest.generated_at && (
+            <>
+              <span className="dot">•</span>
+              <span>最終更新 {new Date(latest.generated_at).toLocaleString("ja-JP")}</span>
+            </>
+          )}
         </div>
       </header>
 
