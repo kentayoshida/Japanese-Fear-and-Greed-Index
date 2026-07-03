@@ -162,18 +162,46 @@ html, body {
   content: ""; width: 4px; height: 18px; border-radius: 2px; background: var(--zone-greed);
 }
 
-/* ---------- Comparison strip ---------- */
-.compare-strip {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+/* ---------- Graph panel（右上トグルで ゲージ⇄ラインチャート を切替） ---------- */
+.graphpanel { margin-top: 8px; }
+.graphpanel__head { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+.graph-toggle {
+  display: inline-flex; gap: 2px; background: var(--fg-surface-alt);
+  border: 1px solid var(--fg-border); border-radius: 999px; padding: 3px;
 }
-.compare-item {
-  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-  padding: 16px 10px; text-align: center; box-shadow: var(--card-shadow);
+.graph-toggle__btn {
+  border: none; background: transparent; color: var(--fg-text-secondary);
+  font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 999px; cursor: pointer;
 }
-.compare-label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-.compare-gauge { width: 84px; margin: 0 auto; }
-.compare-zone { margin-top: 4px; font-size: 12px; font-weight: 700; }
-.compare-zone--empty { color: var(--muted); font-weight: 500; }
+.graph-toggle__btn:hover { color: var(--fg-text); }
+.graph-toggle__btn.is-active { background: #ffffff; color: var(--fg-text); box-shadow: var(--fg-shadow-card); }
+
+/* 概要：ゲージ(左) + 時点比較リスト(右) の2カラム（本家CNN配置） */
+.overview {
+  display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 24px; align-items: center;
+}
+.overview__gauge { min-width: 0; }
+.overview__compare { min-width: 0; }
+
+/* ---------- 時点比較リスト（CNN右側） ---------- */
+.compare-list { display: flex; flex-direction: column; }
+.compare-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 2px; border-bottom: 1px solid var(--fg-border);
+}
+.compare-row:last-child { border-bottom: none; }
+.compare-row__text { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
+.compare-row__label { color: var(--fg-text-secondary); font-size: 12px; }
+.compare-row__state { font-size: 15px; font-weight: 800; }
+.compare-row__dots {
+  flex: 1 1 auto; min-width: 12px; height: 0;
+  border-top: 2px dotted var(--fg-border-strong);
+}
+.compare-row__circle {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  border: 1.5px solid; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: var(--fg-text); font-variant-numeric: tabular-nums;
+}
 
 /* ---------- History chart ---------- */
 .history__header {
@@ -257,8 +285,10 @@ html, body {
 .empty-state { text-align: center; color: var(--muted); padding: 120px 0; line-height: 1.8; }
 
 /* ---------- Responsive ---------- */
+@media (max-width: 720px) {
+  .overview { grid-template-columns: 1fr; gap: 8px; }
+}
 @media (max-width: 640px) {
-  .compare-strip { grid-template-columns: repeat(2, 1fr); }
   .indicator-grid { grid-template-columns: 1fr; }
   .guide__cards { grid-template-columns: 1fr; }
   .topnav { justify-content: center; }
