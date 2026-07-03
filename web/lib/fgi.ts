@@ -11,6 +11,7 @@ export type Component = {
   inverted: boolean;
   stale: boolean;
   description?: string;
+  data_date?: string; // この指標が使っている生値の基準日（公表日）
 };
 
 export type Latest = {

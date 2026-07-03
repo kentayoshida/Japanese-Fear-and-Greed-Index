@@ -181,7 +181,7 @@ export default function Page() {
         <h2 className="section-title">指標の内訳</h2>
         <div className="indicator-grid">
           {latest.components.map((c) => (
-            <IndicatorCard key={c.id} c={c} />
+            <IndicatorCard key={c.id} c={c} generatedAt={latest.generated_at} />
           ))}
         </div>
       </section>

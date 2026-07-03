@@ -24,6 +24,7 @@ class ComponentScore:
     inverted: bool
     stale: bool = False
     description_ja: str = ""
+    data_date: str | None = None  # この指標が使っている生値の基準日（公表日）
 
 
 def band_for_score(config: Config, score: float) -> tuple[str, str]:
@@ -61,6 +62,7 @@ def compose(config: Config, components: list[ComponentScore], as_of: str) -> dic
                 "inverted": c.inverted,
                 "stale": c.stale or c.score is None,
                 "description": c.description_ja,
+                "data_date": c.data_date,
             }
         )
 
