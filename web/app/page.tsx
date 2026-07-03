@@ -122,7 +122,7 @@ export default function Page() {
       </section>
 
       <section className="section">
-        <HistoryChart history={history} />
+        <HistoryChart history={history} indexLabel={latest.index_label} />
       </section>
 
       <section className="section">

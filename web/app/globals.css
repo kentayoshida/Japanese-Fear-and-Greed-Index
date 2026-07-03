@@ -127,6 +127,12 @@ html, body {
 }
 .chart-tooltip__date { color: var(--muted); }
 .chart-tooltip__score { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.chart-tooltip__index { color: #3b6fb0; font-size: 12px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* チャート凡例（スコア / 指数の2ライン） */
+.chart-legend { display: flex; gap: 16px; justify-content: flex-end; margin: 2px 4px 0; }
+.chart-legend__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.chart-legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 
 /* ---------- Indicator cards ---------- */
 .indicator-grid {

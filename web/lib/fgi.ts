@@ -27,6 +27,10 @@ export type Latest = {
   sample?: boolean;
   fetch_errors?: Record<string, string>;
   disclaimer?: string;
+  variant?: string;
+  variant_label?: string;
+  index_label?: string; // チャートに重ねる指数名（例 TOPIX / 日経225）
+  index_value?: number;
 };
 
 export type HistoryPoint = {
@@ -34,6 +38,7 @@ export type HistoryPoint = {
   score: number;
   band: string;
   coverage: number;
+  index?: number; // 版の株価指数終値（チャートのオーバーレイ用）
 };
 
 // 版（TOPIX版 / 日経225版）。variants.json のマニフェスト。
