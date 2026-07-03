@@ -24,7 +24,12 @@ ENGINE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ENGINE_ROOT))
 
 from fgi.config import load_config, variant_config  # noqa: E402
-from fgi.pipeline import build_history, build_latest, build_sparks, union_business_dates  # noqa: E402
+from fgi.pipeline import (  # noqa: E402
+    build_history,
+    build_latest,
+    build_raw_series,
+    union_business_dates,
+)
 from fgi.providers import provide_variants  # noqa: E402
 
 
@@ -89,11 +94,11 @@ def main() -> int:
         dates = union_business_dates(raw_series, start=start)
         history = build_history(vcfg, raw_series, dates, index_series=equity)
 
-        # 指標カードのミニ時系列（直近90営業日ぶんの正規化スコア）
-        spark_dates = dates[-90:] if len(dates) > 90 else dates
-        sparks = build_sparks(vcfg, raw_series, spark_dates)
+        # 指標カードの生値チャート（直近252営業日ぶんの生値・CNN型）
+        chart_dates = dates[-252:] if len(dates) > 252 else dates
+        series_map = build_raw_series(vcfg, raw_series, chart_dates)
         for comp in latest["components"]:
-            comp["spark"] = sparks.get(comp["id"], [])
+            comp["series"] = series_map.get(comp["id"], [])
 
         # 版別ファイル
         vlatest = _variant_path(latest_base, v.key)
