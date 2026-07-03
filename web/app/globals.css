@@ -1,19 +1,19 @@
 :root {
-  /* CNN 本家準拠のライトテーマ（白背景） */
-  --bg: #ffffff;
-  --panel: #ffffff;
-  --panel-2: #f1f3f6;
-  --border: #e2e5ea;
-  --text: #1a1d21;
-  --muted: #6b7280;
-  --ink: #1a1d21;        /* ゲージ針・数値などの濃色 */
-  --card-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  /* 既存クラス互換のエイリアス。実体は design-tokens.css の --fg-* に集約。 */
+  --bg: var(--fg-bg);
+  --panel: var(--fg-surface);
+  --panel-2: var(--fg-surface-alt);
+  --border: var(--fg-border);
+  --text: var(--fg-text);
+  --muted: var(--fg-text-secondary);
+  --ink: var(--fg-gauge-needle-color);
+  --card-shadow: var(--fg-shadow-card);
 
-  --zone-extreme-fear: #c0392b;
-  --zone-fear: #e07b1f;
-  --zone-neutral: #d8b400;
-  --zone-greed: #70bb50;
-  --zone-extreme-greed: #1a9850;
+  --zone-extreme-fear: var(--fg-extreme-fear);
+  --zone-fear: var(--fg-fear);
+  --zone-neutral: var(--fg-neutral);
+  --zone-greed: var(--fg-greed);
+  --zone-extreme-greed: var(--fg-extreme-greed);
 }
 
 * { box-sizing: border-box; }
@@ -21,17 +21,16 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
-    "Noto Sans JP", "Segoe UI", Meiryo, sans-serif;
+  background: var(--fg-bg);
+  color: var(--fg-text);
+  font-family: var(--fg-font-body);
   -webkit-font-smoothing: antialiased;
 }
 
 .page {
-  max-width: 960px;
+  max-width: var(--fg-maxwidth);
   margin: 0 auto;
-  padding: 32px 20px 80px;
+  padding: 24px 20px 80px;
 }
 
 /* ---------- Top nav (ダッシュボード / 解説) ---------- */
@@ -102,17 +101,17 @@ html, body {
 /* ---------- Hero ---------- */
 .hero { text-align: center; padding: 16px 0 8px; }
 .hero__eyebrow {
-  font-size: 13px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: var(--fg-eyebrow-size);
+  letter-spacing: var(--fg-letter-eyebrow);
+  color: var(--fg-text-secondary);
   font-weight: 700;
 }
 .hero__title {
-  font-size: clamp(28px, 5vw, 44px);
+  font-family: var(--fg-font-display);
+  font-size: var(--fg-h1-size);
   font-weight: 800;
-  margin: 10px 0 8px;
-  line-height: 1.2;
+  margin: 8px 0 4px;
+  line-height: var(--fg-line-tight);
 }
 .hero__sub { color: var(--muted); margin: 0 auto; max-width: 540px; font-size: 15px; }
 .hero__meta {
@@ -142,9 +141,16 @@ html, body {
 .notice--sample { background: #fdf6e3; border: 1px solid var(--zone-neutral); color: #8a6d00; }
 
 /* ---------- Gauge ---------- */
-.gauge { max-width: 480px; margin: 8px auto 0; }
-.gauge svg { width: 100%; height: auto; display: block; }
-.needle { transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+.gauge { position: relative; max-width: var(--fg-gauge-maxwidth); margin: 8px auto 0; }
+.gauge svg { width: 100%; height: auto; display: block; overflow: visible; }
+.gauge__readout {
+  position: absolute; left: 0; right: 0; bottom: 24%;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  pointer-events: none;
+}
+.gauge__score { color: var(--fg-text); font-size: clamp(2.6rem, 9vw, 4.4rem); }
+.gauge__band { font-size: clamp(0.95rem, 2.4vw, 1.3rem); font-weight: 800; margin-top: 2px; }
+.needle { transition: transform var(--fg-dur-needle) var(--fg-ease); }
 
 /* ---------- Sections ---------- */
 .section { margin-top: 48px; }
@@ -201,9 +207,21 @@ html, body {
 .chart-legend__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .chart-legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 
-/* ---------- Indicator cards ---------- */
+/* ---------- Indicator cards（縦積みリスト・cnn-design-brief §2.3） ---------- */
 .indicator-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+  display: grid; grid-template-columns: 1fr; gap: 14px;
+  max-width: 760px; margin: 0 auto;
+}
+.indicator-card__chartrow { display: flex; align-items: stretch; gap: 10px; margin: 12px 0 12px; }
+.indicator-card__ends {
+  display: flex; flex-direction: column; justify-content: space-between;
+  font-size: 10px; color: var(--fg-text-muted); font-weight: 700; padding: 2px 0;
+}
+.spark { flex: 1 1 auto; min-width: 0; }
+.spark--empty {
+  height: 60px; display: flex; align-items: center; justify-content: center;
+  color: var(--fg-text-muted); font-size: 12px; background: var(--fg-surface-alt);
+  border-radius: var(--fg-radius-sm);
 }
 .indicator-card {
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px;

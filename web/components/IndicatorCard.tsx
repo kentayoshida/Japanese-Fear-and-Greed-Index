@@ -1,8 +1,10 @@
 "use client";
 
-// 指標内訳カード。仕様 §6.5。
-// 各指標に小型ゲージ（横バー）＋現在値＋ラベル（Fear/Greed どちら寄りか）。
+// 指標内訳カード（cnn-design-brief §2.3）。縦積み。
+// eyebrow(カテゴリ) / H3(タイトル) / ミニ時系列(正規化スコア) / 両端ラベル(恐怖⇄貪欲) /
+// 現在値・生値・重み・基準日・取得日時 / 日本語の短い説明。
 
+import { Line, LineChart, ReferenceArea, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Component, ZONES, leanForComponent, colorForScore } from "@/lib/fgi";
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -15,7 +17,6 @@ const DIMENSION_LABELS: Record<string, string> = {
 };
 
 // 指標ごとの一言説明（データに description が無い場合のフォールバック）。
-// 通常は版別の説明（TOPIX / 日経225）が c.description で渡る。
 const DESCRIPTIONS: Record<string, string> = {
   momentum_125dma: "株価指数と125日移動平均の乖離。上方乖離は強気。",
   advance_decline_25: "値上がり÷値下がり銘柄数の25日累積。市場の幅。",
@@ -27,36 +28,36 @@ const DESCRIPTIONS: Record<string, string> = {
   safe_haven: "株式と債券の20日リターン差。株式優位なら強気。",
 };
 
-function MiniBar({ score }: { score: number | null }) {
-  return (
-    <div className="minibar">
-      <div className="minibar__track">
-        {ZONES.map((z) => (
-          <div
-            key={z.key}
-            className="minibar__zone"
-            style={{ left: `${z.min}%`, width: `${z.max - z.min}%`, background: z.color, opacity: 0.35 }}
-          />
-        ))}
-        {score !== null && (
-          <div className="minibar__marker" style={{ left: `${Math.max(0, Math.min(100, score))}%` }} />
-        )}
-      </div>
-    </div>
-  );
-}
-
 function formatFetched(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleString("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
   });
+}
+
+function MiniSpark({ data }: { data: { d: string; s: number | null }[] }) {
+  const valid = data.filter((p) => typeof p.s === "number");
+  if (valid.length < 2) {
+    return <div className="spark spark--empty">データ蓄積中…</div>;
+  }
+  return (
+    <div className="spark">
+      <ResponsiveContainer width="100%" height={60}>
+        <LineChart data={data} margin={{ top: 3, right: 2, bottom: 0, left: 2 }}>
+          {ZONES.map((z) => (
+            <ReferenceArea key={z.key} y1={z.min} y2={z.max} fill={z.color}
+                           fillOpacity={0.12} ifOverflow="extendDomain" />
+          ))}
+          <XAxis dataKey="d" hide />
+          <YAxis domain={[0, 100]} hide />
+          <Line type="monotone" dataKey="s" stroke="#1a1d21" strokeWidth={1.5}
+                dot={false} isAnimationActive={false} connectNulls />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 export default function IndicatorCard({
@@ -68,11 +69,13 @@ export default function IndicatorCard({
 }) {
   const lean = leanForComponent(c);
   const fetched = formatFetched(generatedAt);
+  const spark = c.spark ?? [];
+
   return (
-    <div className={`indicator-card ${c.stale ? "is-stale" : ""}`}>
+    <article className={`indicator-card ${c.stale ? "is-stale" : ""}`}>
       <div className="indicator-card__top">
         <div>
-          <div className="indicator-card__dim">{DIMENSION_LABELS[c.dimension] ?? c.dimension}</div>
+          <div className="fg-eyebrow">{DIMENSION_LABELS[c.dimension] ?? c.dimension}</div>
           <h3 className="indicator-card__label">{c.label}</h3>
         </div>
         <div className="indicator-card__score">
@@ -84,7 +87,13 @@ export default function IndicatorCard({
         </div>
       </div>
 
-      <MiniBar score={c.score} />
+      <div className="indicator-card__chartrow">
+        <div className="indicator-card__ends" aria-hidden="true">
+          <span>貪欲</span>
+          <span>恐怖</span>
+        </div>
+        <MiniSpark data={spark} />
+      </div>
 
       <div className="indicator-card__meta">
         {c.stale ? (
@@ -105,6 +114,6 @@ export default function IndicatorCard({
       </div>
 
       <p className="indicator-card__desc">{c.description || DESCRIPTIONS[c.id] || ""}</p>
-    </div>
+    </article>
   );
 }

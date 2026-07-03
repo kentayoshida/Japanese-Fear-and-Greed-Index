@@ -12,6 +12,7 @@ export type Component = {
   stale: boolean;
   description?: string;
   data_date?: string; // この指標が使っている生値の基準日（公表日）
+  spark?: { d: string; s: number | null }[]; // 直近の正規化スコア時系列（ミニチャート用）
 };
 
 export type Latest = {
@@ -63,11 +64,12 @@ export type Zone = {
   color: string;
 };
 
+// 色は design-tokens.css の 5ゾーン配色と一致させる。
 export const ZONES: Zone[] = [
   { key: "extreme-fear", labelJa: "極度の恐怖", min: 0, max: 25, color: "#c0392b" },
-  { key: "fear", labelJa: "恐怖", min: 25, max: 45, color: "#e07b1f" },
-  { key: "neutral", labelJa: "中立", min: 45, max: 55, color: "#d8b400" },
-  { key: "greed", labelJa: "貪欲", min: 55, max: 75, color: "#70bb50" },
+  { key: "fear", labelJa: "恐怖", min: 25, max: 45, color: "#e67e22" },
+  { key: "neutral", labelJa: "中立", min: 45, max: 55, color: "#e6b800" },
+  { key: "greed", labelJa: "貪欲", min: 55, max: 75, color: "#7cb342" },
   { key: "extreme-greed", labelJa: "極度の貪欲", min: 75, max: 100, color: "#1a9850" },
 ];
 

@@ -106,6 +106,38 @@ def build_history(
     return out
 
 
+def build_sparks(
+    config: Config, raw_series: dict[str, IndicatorSeries], dates: list[pd.Timestamp]
+) -> dict[str, list]:
+    """各指標の正規化スコアを dates 上で point-in-time 算出（カードのミニ時系列用）。
+
+    返り値: {indicator_id: [{"d": "YYYY-MM-DD", "s": score|None}, ...]}
+    """
+    from .normalize import normalize_indicator
+
+    out: dict[str, list] = {}
+    for ind in config.indicators:
+        ser = raw_series.get(ind.id)
+        pts: list = []
+        if ser is not None:
+            for d in dates:
+                w = ser.as_of(d).dropna()
+                s = None
+                if len(w):
+                    try:
+                        s = normalize_indicator(
+                            method=ind.method, history=list(w.values),
+                            lookback=config.lookback_days, inverted=ind.inverted,
+                            anchors=ind.anchors,
+                        )
+                    except Exception:  # noqa: BLE001
+                        s = None
+                pts.append({"d": pd.Timestamp(d).strftime("%Y-%m-%d"),
+                            "s": None if s is None else round(float(s), 1)})
+        out[ind.id] = pts
+    return out
+
+
 def union_business_dates(
     raw_series: dict[str, IndicatorSeries], start: pd.Timestamp | None = None
 ) -> list[pd.Timestamp]:

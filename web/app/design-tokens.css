@@ -1,0 +1,122 @@
+/* ============================================================
+   日本版 Fear & Greed Index — デザイントークン
+   CNN Fear & Greed Index (edition.cnn.com/markets/fear-and-greed)
+   のレイアウト・情報設計・配色ロジックを踏襲した再現用トークン。
+
+   注意：
+   - CNN のロゴ・ブランド名・説明文は流用しない。テキストは日本語オリジナル。
+   - CNN 本体は Canvas/SVG 描画のため実CSS値は非公開。以下は本家の
+     見た目に合わせた再現用の推奨値であり、実装時にライブページを
+     見ながら微調整すること。
+   ============================================================ */
+
+:root {
+  /* --- 5ゾーンのセンチメント配色（0-100スケール） --- */
+  --fg-extreme-fear:  #c0392b;  /* 極度の恐怖 0-25   赤 */
+  --fg-fear:          #e67e22;  /* 恐怖       25-45  橙 */
+  --fg-neutral:       #e6b800;  /* 中立       45-55  黄 */
+  --fg-greed:         #7cb342;  /* 貪欲       55-75  黄緑 */
+  --fg-extreme-greed: #1a9850;  /* 極度の貪欲 75-100 緑 */
+
+  /* ゲージのグラデーション（赤→橙→黄→黄緑→緑の連続アーク） */
+  --fg-gauge-gradient:
+    #c0392b 0%, #e67e22 25%, #e6b800 50%, #7cb342 75%, #1a9850 100%;
+
+  /* --- UI 地の色（ライトテーマ・白基調＋薄いグレー枠） --- */
+  --fg-bg:            #ffffff;
+  --fg-surface:       #ffffff;
+  --fg-surface-alt:   #f7f8fa;
+  --fg-border:        #e0e0e0;
+  --fg-border-strong: #c7ccd1;
+
+  /* --- テキスト色 --- */
+  --fg-text:          #0d0d0d;
+  --fg-text-secondary:#5a6570;
+  --fg-text-muted:    #8a929b;
+  --fg-text-invert:   #ffffff;
+
+  /* --- アクセント --- */
+  --fg-accent:        #cc0000;
+  --fg-accent-hover:  #a30000;
+
+  /* --- タイポグラフィ --- */
+  --fg-font-display:  "Inter", "Helvetica Neue", Arial,
+                      "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  --fg-font-body:     "Inter", "Helvetica Neue", Arial,
+                      "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  --fg-font-number:   "Inter", "Roboto Mono", "SF Mono", monospace;
+
+  --fg-score-size:    clamp(3.5rem, 12vw, 7rem);
+  --fg-score-weight:  700;
+  --fg-h1-size:       clamp(1.5rem, 4vw, 2.25rem);
+  --fg-h2-size:       1.25rem;
+  --fg-h3-size:       1.0625rem;
+  --fg-body-size:     0.9375rem;
+  --fg-caption-size:  0.8125rem;
+  --fg-eyebrow-size:  0.75rem;
+
+  --fg-line-tight:    1.15;
+  --fg-line-body:     1.6;
+  --fg-letter-eyebrow:0.08em;
+
+  /* --- スペーシング（8pxベース） --- */
+  --fg-space-1: 0.25rem;
+  --fg-space-2: 0.5rem;
+  --fg-space-3: 0.75rem;
+  --fg-space-4: 1rem;
+  --fg-space-6: 1.5rem;
+  --fg-space-8: 2rem;
+  --fg-space-12: 3rem;
+  --fg-space-16: 4rem;
+
+  /* --- 角丸・影・線 --- */
+  --fg-radius-sm: 4px;
+  --fg-radius:    8px;
+  --fg-radius-lg: 12px;
+  --fg-shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --fg-shadow-hover:0 4px 12px rgba(0,0,0,0.10);
+  --fg-hairline: 1px solid var(--fg-border);
+
+  /* --- ゲージ寸法 --- */
+  --fg-gauge-track-width: 22px;
+  --fg-gauge-needle-color:#0d0d0d;
+  --fg-gauge-tick-color:  #ffffff;
+
+  /* --- レイアウト幅 --- */
+  --fg-maxwidth: 1024px;
+  --fg-gauge-maxwidth: 640px;
+
+  /* --- モーション --- */
+  --fg-ease: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --fg-dur-needle: 900ms;
+  --fg-dur-fade: 300ms;
+}
+
+/* スコア→色 のユーティリティ（バンド別クラス） */
+.fg-band-extreme-fear  { color: var(--fg-extreme-fear); }
+.fg-band-fear          { color: var(--fg-fear); }
+.fg-band-neutral       { color: var(--fg-neutral); }
+.fg-band-greed         { color: var(--fg-greed); }
+.fg-band-extreme-greed { color: var(--fg-extreme-greed); }
+
+/* eyebrow（"market momentum" 相当の小見出し） */
+.fg-eyebrow {
+  font-size: var(--fg-eyebrow-size);
+  letter-spacing: var(--fg-letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--fg-text-secondary);
+  font-weight: 600;
+}
+
+/* ヒーローの大スコア数値 */
+.fg-score {
+  font-family: var(--fg-font-number);
+  font-size: var(--fg-score-size);
+  font-weight: var(--fg-score-weight);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --fg-dur-needle: 0ms; --fg-dur-fade: 0ms; }
+}
