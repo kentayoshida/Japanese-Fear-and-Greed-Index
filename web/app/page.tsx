@@ -5,6 +5,7 @@ import Gauge from "@/components/Gauge";
 import ComparisonStrip from "@/components/ComparisonStrip";
 import HistoryChart from "@/components/HistoryChart";
 import IndicatorCard from "@/components/IndicatorCard";
+import FaqAccordion from "@/components/FaqAccordion";
 import GuideView from "@/components/GuideView";
 import { Latest, HistoryPoint, VariantInfo, VariantsManifest } from "@/lib/fgi";
 
@@ -200,6 +201,8 @@ export default function Page() {
           ))}
         </div>
       </section>
+
+      <FaqAccordion />
 
       <footer className="footer">
         <p className="disclaimer">

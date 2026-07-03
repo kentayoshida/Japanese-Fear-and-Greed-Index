@@ -138,6 +138,26 @@ def build_sparks(
     return out
 
 
+def build_raw_series(
+    config: Config, raw_series: dict[str, IndicatorSeries], dates: list[pd.Timestamp]
+) -> dict[str, list]:
+    """各指標の「生値」を dates 上で point-in-time 取得（カードの生値チャート用・CNN型）。
+
+    返り値: {indicator_id: [{"d": "YYYY-MM-DD", "v": raw|None}, ...]}
+    """
+    out: dict[str, list] = {}
+    for ind in config.indicators:
+        ser = raw_series.get(ind.id)
+        pts: list = []
+        if ser is not None:
+            for d in dates:
+                w = ser.as_of(d).dropna()
+                v = None if len(w) == 0 else round(float(w.iloc[-1]), 4)
+                pts.append({"d": pd.Timestamp(d).strftime("%Y-%m-%d"), "v": v})
+        out[ind.id] = pts
+    return out
+
+
 def union_business_dates(
     raw_series: dict[str, IndicatorSeries], start: pd.Timestamp | None = None
 ) -> list[pd.Timestamp]:

@@ -144,12 +144,10 @@ html, body {
 .gauge { position: relative; max-width: var(--fg-gauge-maxwidth); margin: 8px auto 0; }
 .gauge svg { width: 100%; height: auto; display: block; overflow: visible; }
 .gauge__readout {
-  position: absolute; left: 0; right: 0; bottom: 24%;
-  display: flex; flex-direction: column; align-items: center; gap: 0;
-  pointer-events: none;
+  position: absolute; left: 0; right: 0; top: 83%; transform: translateY(-50%);
+  display: flex; justify-content: center; pointer-events: none;
 }
-.gauge__score { color: var(--fg-text); font-size: clamp(2.6rem, 9vw, 4.4rem); }
-.gauge__band { font-size: clamp(0.95rem, 2.4vw, 1.3rem); font-weight: 800; margin-top: 2px; }
+.gauge__score { color: var(--fg-text); font-size: clamp(2rem, 6.5vw, 3.1rem); line-height: 1; }
 .needle { transition: transform var(--fg-dur-needle) var(--fg-ease); }
 
 /* ---------- Sections ---------- */
@@ -235,48 +233,51 @@ html, body {
 .chart-legend__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .chart-legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 
-/* ---------- Indicator cards（縦積みリスト・cnn-design-brief §2.3） ---------- */
-.indicator-grid {
-  display: grid; grid-template-columns: 1fr; gap: 14px;
-  max-width: 760px; margin: 0 auto;
+/* ---------- Indicator cards（本家CNN型・2カラム） ---------- */
+.indicator-grid { display: grid; grid-template-columns: 1fr; gap: 0; max-width: 940px; margin: 0 auto; }
+.ind-card {
+  display: grid; grid-template-columns: 1.55fr 1fr; gap: 28px;
+  padding: 24px 4px; border-bottom: 1px solid var(--fg-border); align-items: start;
 }
-.indicator-card__chartrow { display: flex; align-items: stretch; gap: 10px; margin: 12px 0 12px; }
-.indicator-card__ends {
-  display: flex; flex-direction: column; justify-content: space-between;
-  font-size: 10px; color: var(--fg-text-muted); font-weight: 700; padding: 2px 0;
-}
-.spark { flex: 1 1 auto; min-width: 0; }
-.spark--empty {
-  height: 60px; display: flex; align-items: center; justify-content: center;
+.ind-card:first-child { border-top: 1px solid var(--fg-border); }
+.ind-card.is-stale { opacity: 0.72; }
+.ind-card__main { min-width: 0; }
+.ind-card__title { font-size: var(--fg-h3-size); font-weight: 800; margin: 3px 0 1px; line-height: 1.35; }
+.ind-card__sub { font-size: 12.5px; color: var(--fg-text-secondary); margin-bottom: 10px; }
+.ind-card__updated { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--fg-text-muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.ind-card__updated .dot { opacity: 0.5; }
+.rawchart { width: 100%; }
+.rawchart--empty {
+  height: 150px; display: flex; align-items: center; justify-content: center;
   color: var(--fg-text-muted); font-size: 12px; background: var(--fg-surface-alt);
   border-radius: var(--fg-radius-sm);
 }
-.indicator-card {
-  background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px;
-  box-shadow: var(--card-shadow);
+.ind-card__side { padding-top: 22px; }
+.ind-badge {
+  display: inline-block; border: 1.5px solid; border-radius: var(--fg-radius-sm);
+  padding: 3px 12px; font-size: 12px; font-weight: 800; margin-bottom: 10px;
 }
-.indicator-card.is-stale { opacity: 0.7; }
-.indicator-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-.indicator-card__dim { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
-.indicator-card__label { font-size: 15px; font-weight: 700; margin: 4px 0 0; line-height: 1.35; }
-.indicator-card__score { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
-.indicator-card__score .muted { color: var(--muted); }
+.ind-card__desc { color: var(--fg-text); font-size: 13.5px; line-height: 1.85; margin: 0; }
+.ind-card__figures { color: var(--fg-text-secondary); font-size: 12px; margin: 10px 0 0; font-variant-numeric: tabular-nums; }
+.ind-card__figures .dot { opacity: 0.5; margin: 0 6px; }
 
-.minibar { margin: 14px 0 10px; }
-.minibar__track { position: relative; height: 10px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
-.minibar__zone { position: absolute; top: 0; bottom: 0; }
-.minibar__marker {
-  position: absolute; top: -3px; width: 3px; height: 16px; border-radius: 2px;
-  background: var(--text); transform: translateX(-50%);
-  box-shadow: 0 0 0 2px rgba(0,0,0,0.5);
+/* ---------- FAQ アコーディオン ---------- */
+.faq__list { max-width: 940px; margin: 0 auto; }
+.faq__item { border-bottom: 1px solid var(--fg-border); }
+.faq__item:first-child { border-top: 1px solid var(--fg-border); }
+.faq__q {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  cursor: pointer; list-style: none; padding: 16px 2px;
+  font-size: 15px; font-weight: 700; color: var(--fg-text);
 }
-
-.indicator-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; color: var(--muted); }
-.badge { border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; font-weight: 700; font-size: 11px; }
-.badge--stale { color: var(--zone-fear); border-color: var(--zone-fear); }
-.indicator-card__raw, .indicator-card__weight { font-variant-numeric: tabular-nums; }
-.indicator-card__asof, .indicator-card__fetched { font-variant-numeric: tabular-nums; color: var(--muted); }
-.indicator-card__desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
+.faq__q::-webkit-details-marker { display: none; }
+.faq__chev {
+  flex: none; width: 10px; height: 10px; border-right: 2px solid var(--fg-text-secondary);
+  border-bottom: 2px solid var(--fg-text-secondary); transform: rotate(45deg);
+  transition: transform var(--fg-dur-fade) var(--fg-ease); margin-right: 4px;
+}
+.faq__item[open] .faq__chev { transform: rotate(-135deg); }
+.faq__a { color: var(--fg-text); font-size: 13.5px; line-height: 1.9; margin: 0 2px 18px; max-width: 760px; }
 
 /* ---------- Footer / states ---------- */
 .footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; }
@@ -289,7 +290,8 @@ html, body {
   .overview { grid-template-columns: 1fr; gap: 8px; }
 }
 @media (max-width: 640px) {
-  .indicator-grid { grid-template-columns: 1fr; }
+  .ind-card { grid-template-columns: 1fr; gap: 10px; }
+  .ind-card__side { padding-top: 0; }
   .guide__cards { grid-template-columns: 1fr; }
   .topnav { justify-content: center; }
 }

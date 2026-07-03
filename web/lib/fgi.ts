@@ -12,7 +12,8 @@ export type Component = {
   stale: boolean;
   description?: string;
   data_date?: string; // この指標が使っている生値の基準日（公表日）
-  spark?: { d: string; s: number | null }[]; // 直近の正規化スコア時系列（ミニチャート用）
+  spark?: { d: string; s: number | null }[]; // 直近の正規化スコア時系列（旧・未使用）
+  series?: { d: string; v: number | null }[]; // 生値の時系列（CNN型カードチャート用）
 };
 
 export type Latest = {
