@@ -41,6 +41,9 @@ function makeTooltip(indexLabel: string) {
             {indexLabel} {p.index.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </div>
         )}
+        {typeof p.coverage === "number" && (
+          <div className="chart-tooltip__cov">採用指標 {p.coverage}/8</div>
+        )}
       </div>
     );
   };
@@ -161,6 +164,13 @@ export default function HistoryChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {data.some((d) => typeof d.coverage === "number" && d.coverage < 8) && (
+        <p className="chart-note">
+          ※ 全8指標がそろう前の期間は、その時点で入手できた少数の指標で算出しています
+          （各点の採用指標数はツールチップに表示）。指標が蓄積するほど本来の合成に近づきます。
+        </p>
+      )}
     </div>
   );
 }

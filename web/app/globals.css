@@ -193,6 +193,8 @@ html, body {
 .chart-tooltip__date { color: var(--muted); }
 .chart-tooltip__score { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
 .chart-tooltip__index { color: #3b6fb0; font-size: 12px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.chart-tooltip__cov { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.chart-note { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 10px 4px 0; }
 
 /* チャート凡例（スコア / 指数の2ライン） */
 .chart-legend { display: flex; gap: 16px; justify-content: flex-end; margin: 2px 4px 0; }
