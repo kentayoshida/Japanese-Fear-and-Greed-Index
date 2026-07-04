@@ -5,7 +5,8 @@
 // 弧に沿って回転したゾーン名、内側に 0/25/50/75/100 目盛りと点、下部中央の
 // 白円内に大きなスコア。針は上向き基準を CSS transform で回転。
 
-import { ZONES, zoneForScore } from "@/lib/fgi";
+import { ZONES, zoneForScore, zoneLabel } from "@/lib/fgi";
+import { useLang } from "@/lib/i18n";
 
 const CX = 200;
 const CY = 196;
@@ -42,6 +43,7 @@ function ringSectorPath(s: number, e: number): string {
 }
 
 export default function Gauge({ score }: { score: number | null }) {
+  const { lang } = useLang();
   const hasScore = score !== null && !Number.isNaN(score);
   const value = hasScore ? (score as number) : 50;
   const activeZone = zoneForScore(value);
@@ -50,7 +52,7 @@ export default function Gauge({ score }: { score: number | null }) {
   return (
     <div className="gauge">
       <svg viewBox="-6 0 412 236" role="img"
-           aria-label={`現在のスコア ${hasScore ? Math.round(value) : "—"}（${activeZone.labelJa}）`}>
+           aria-label={`Score ${hasScore ? Math.round(value) : "—"} (${zoneLabel(activeZone, lang)})`}>
         {/* 5ゾーン（既定グレー、アクティブのみ色付き） */}
         {ZONES.map((z) => {
           const isActive = hasScore && z.key === activeZone.key;
@@ -85,7 +87,7 @@ export default function Gauge({ score }: { score: number | null }) {
               dominantBaseline="middle"
               transform={`rotate(${rot} ${p.x.toFixed(2)} ${p.y.toFixed(2)})`}
             >
-              {z.labelJa}
+              {zoneLabel(z, lang)}
             </text>
           );
         })}

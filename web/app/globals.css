@@ -42,7 +42,18 @@ html, body {
 .topnav__brand {
   font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: var(--text);
 }
+.topnav__right { display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .topnav__tabs { display: inline-flex; gap: 4px; }
+.lang-switch {
+  display: inline-flex; gap: 2px; background: var(--fg-surface-alt);
+  border: 1px solid var(--fg-border); border-radius: 999px; padding: 3px;
+}
+.lang-switch button {
+  border: none; background: transparent; color: var(--fg-text-secondary);
+  font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+}
+.lang-switch button:hover { color: var(--fg-text); }
+.lang-switch button.is-active { background: #ffffff; color: var(--fg-text); box-shadow: var(--fg-shadow-card); }
 .topnav__tab {
   border: none; background: transparent; color: var(--muted);
   font-size: 14px; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer;
