@@ -78,14 +78,25 @@ engine/                     計算エンジン（Python / pandas）
       derive.py             生データ→指標生値の純関数（テスト可能。MTM近似含む）
     providers.py            real/demo の生値系列を版ごとに組み立てる
   scripts/run_daily.py      日次ランナー → 版別 latest/history + variants.json
+                            （latest.components[].series に各指標の生値系列も出力）
   tests/                    pytest（正規化・加重・合成・派生・MTM・point-in-time・松井パース）
-web/                        フロントエンド（Next.js + Recharts）
-  app/                      ページ（版切替タブ）・レイアウト・スタイル（CNN風ライトテーマ）
-  components/               Gauge / MiniGauge / ComparisonStrip / HistoryChart / IndicatorCard
+web/                        フロントエンド（Next.js + Recharts）。CNN本家を再現
+  app/design-tokens.css     ★ 配色・型・寸法・ゲージ寸法のデザイントークン(--fg-*)
+  app/globals.css           トークンを土台にしたスタイル（ライトテーマ）
+  app/page.tsx              ダッシュボード/解説の切替。ダッシュボードは
+                            グラフパネル右上の[概要|推移]トグルで ゲージ⇄推移チャート を
+                            切替（下部の構成指標は常時表示）＋版切替タブ(日経225/TOPIX)
+  components/
+    Gauge.tsx               半円ゲージ（グレー地＋アクティブゾーン強調・針・中央スコア）
+    ComparisonStrip.tsx     時点比較リスト（前営業日/1週間/1か月/1年）
+    HistoryChart.tsx        推移チャート（合成スコア＋株価指数の二軸オーバーレイ）
+    IndicatorCard.tsx       指標カード（生値チャート＋状態バッジ＋説明）
+    GuideView.tsx           「指標の解説」タブの内容
+    FaqAccordion.tsx        よくある質問（開閉式）
   public/data/              変動JSON（cron が再生成しコミット）
-    latest.json / history.json            既定版(TOPIX)。後方互換
+    latest.json / history.json            既定版(日経225)。後方互換
     latest.<version>.json / history.<version>.json   版別
-    variants.json                         版一覧（タブ生成用）
+    variants.json                         版一覧（タブ生成・順序・既定版）
     series/                               生値系列の増分キャッシュ（週次信用残・松井実測 等）
 .github/workflows/
   daily.yml                 日次 cron（再生成→コミット→main へ push→Vercel が静的配信）

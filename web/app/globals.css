@@ -113,7 +113,6 @@ html, body {
   margin: 8px 0 4px;
   line-height: var(--fg-line-tight);
 }
-.hero__sub { color: var(--muted); margin: 0 auto; max-width: 540px; font-size: 15px; }
 .hero__meta {
   display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
   color: var(--muted); font-size: 13px; margin-top: 6px;
