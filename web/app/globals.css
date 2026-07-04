@@ -30,7 +30,7 @@ html, body {
 .page {
   max-width: var(--fg-maxwidth);
   margin: 0 auto;
-  padding: 24px 20px 80px;
+  padding: 24px clamp(16px, 3vw, 48px) 80px;
 }
 
 /* ---------- Top nav (ダッシュボード / 解説) ---------- */
@@ -51,7 +51,7 @@ html, body {
 .topnav__tab.is-active { background: var(--panel-2); color: var(--text); }
 
 /* ---------- Guide (解説) ---------- */
-.guide { padding: 8px 0 0; }
+.guide { padding: 8px 0 0; max-width: 920px; margin: 0 auto; }
 .guide__hero { text-align: center; padding: 12px 0 8px; }
 .guide__title { font-size: clamp(24px, 4.5vw, 36px); font-weight: 800; margin: 8px 0; }
 .guide__lead { color: var(--muted); max-width: 640px; margin: 0 auto; font-size: 15px; line-height: 1.8; }
@@ -233,7 +233,7 @@ html, body {
 .chart-legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 
 /* ---------- Indicator cards（本家CNN型・2カラム） ---------- */
-.indicator-grid { display: grid; grid-template-columns: 1fr; gap: 0; max-width: 940px; margin: 0 auto; }
+.indicator-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
 .ind-card {
   display: grid; grid-template-columns: 1.55fr 1fr; gap: 28px;
   padding: 24px 4px; border-bottom: 1px solid var(--fg-border); align-items: start;
@@ -261,7 +261,7 @@ html, body {
 .ind-card__figures .dot { opacity: 0.5; margin: 0 6px; }
 
 /* ---------- FAQ アコーディオン ---------- */
-.faq__list { max-width: 940px; margin: 0 auto; }
+.faq__list { }
 .faq__item { border-bottom: 1px solid var(--fg-border); }
 .faq__item:first-child { border-top: 1px solid var(--fg-border); }
 .faq__q {

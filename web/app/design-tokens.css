@@ -83,8 +83,8 @@
   --fg-gauge-tick-color:  #ffffff;
 
   /* --- レイアウト幅 --- */
-  --fg-maxwidth: 1024px;
-  --fg-gauge-maxwidth: 640px;
+  --fg-maxwidth: 1600px;   /* デスクトップでウィンドウ幅に追従して拡大（上限） */
+  --fg-gauge-maxwidth: 620px;
 
   /* --- モーション --- */
   --fg-ease: cubic-bezier(0.4, 0.0, 0.2, 1);
