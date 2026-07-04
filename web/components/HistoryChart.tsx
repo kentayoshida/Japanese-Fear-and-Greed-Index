@@ -1,20 +1,20 @@
 "use client";
 
-// ヒストリカル時系列チャート。仕様 §6.5。
-// 合成スコア（左軸）の折れ線＋背景に5ゾーンの色帯。加えて版の株価指数（右軸）を
-// 重ねて描画し、スコアと実際の指数水準の関係を読み取れるようにする。期間切替。
+// ヒストリカル時系列チャート（本家CNN Timeline 風）。
+// 既定は F&G 合成スコアのみの青ライン。「指数を重ねる」トグルONで版の株価指数を
+// 右→左の二軸で重ねて表示する。
 
 import { useState } from "react";
 import {
+  CartesianGrid,
   Line,
   LineChart,
-  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { HistoryPoint, ZONES, colorForScore } from "@/lib/fgi";
+import { HistoryPoint } from "@/lib/fgi";
 
 const RANGES: { key: string; label: string; days: number | null }[] = [
   { key: "1m", label: "1M", days: 21 },
@@ -24,20 +24,26 @@ const RANGES: { key: string; label: string; days: number | null }[] = [
   { key: "max", label: "MAX", days: null },
 ];
 
-const INDEX_COLOR = "#3b6fb0"; // 指数ラインの色（スコアの濃墨と区別できる青）
+const LINE_COLOR = "#1a6ba5"; // 本家CNN系の青（F&Gスコア）
+const INDEX_COLOR = "#d98a2b"; // 指数ライン（本家の移動平均線に近いオレンジ）
+const AXIS_COLOR = "#a2937d"; // 本家CNN系の淡いタン系（軸の数字・月ラベル）
 
-function makeTooltip(indexLabel: string) {
+function monthTick(d: string): string {
+  return d.length >= 7 ? d.slice(0, 7).replace("-", "/") : d;
+}
+
+function makeTooltip(showIndex: boolean, indexLabel: string) {
   return function CustomTooltip({ active, payload }: any) {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload as HistoryPoint;
     return (
       <div className="chart-tooltip">
         <div className="chart-tooltip__date">{p.date}</div>
-        <div className="chart-tooltip__score" style={{ color: colorForScore(p.score) }}>
+        <div className="chart-tooltip__score" style={{ color: LINE_COLOR }}>
           {p.score.toFixed(1)}
         </div>
-        {typeof p.index === "number" && (
-          <div className="chart-tooltip__index">
+        {showIndex && typeof p.index === "number" && (
+          <div className="chart-tooltip__index" style={{ color: INDEX_COLOR }}>
             {indexLabel} {p.index.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </div>
         )}
@@ -57,33 +63,47 @@ export default function HistoryChart({
   indexLabel?: string;
 }) {
   const [range, setRange] = useState("1y");
+  const [showIndex, setShowIndex] = useState(false);
   const cfg = RANGES.find((r) => r.key === range)!;
   const data = cfg.days ? history.slice(-cfg.days) : history;
   const hasIndex = data.some((d) => typeof d.index === "number");
+  const overlay = showIndex && hasIndex;
 
   return (
     <div className="history">
       <div className="history__header">
         <h2 className="section-title">ヒストリカル推移</h2>
-        <div className="range-toggle" role="tablist" aria-label="期間切替">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              role="tab"
-              aria-selected={r.key === range}
-              className={`range-btn ${r.key === range ? "is-active" : ""}`}
-              onClick={() => setRange(r.key)}
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="history__controls">
+          {hasIndex && (
+            <label className="index-toggle">
+              <input
+                type="checkbox"
+                checked={showIndex}
+                onChange={(e) => setShowIndex(e.target.checked)}
+              />
+              指数を重ねる
+            </label>
+          )}
+          <div className="range-toggle" role="tablist" aria-label="期間切替">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                role="tab"
+                aria-selected={r.key === range}
+                className={`range-btn ${r.key === range ? "is-active" : ""}`}
+                onClick={() => setRange(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {hasIndex && (
+      {overlay && (
         <div className="chart-legend">
           <span className="chart-legend__item">
-            <span className="chart-legend__swatch" style={{ background: "#1a1d21" }} />
+            <span className="chart-legend__swatch" style={{ background: LINE_COLOR }} />
             F&amp;G スコア
           </span>
           <span className="chart-legend__item">
@@ -93,71 +113,66 @@ export default function HistoryChart({
         </div>
       )}
 
-      <div className="history__chart">
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 4 }}>
-            {/* 背景のゾーン色帯（スコア軸に対して） */}
-            {ZONES.map((z) => (
-              <ReferenceArea
-                key={z.key}
-                yAxisId="score"
-                y1={z.min}
-                y2={z.max}
-                fill={z.color}
-                fillOpacity={0.16}
-                ifOverflow="extendDomain"
-              />
-            ))}
+      <div className="history__chart tlchart">
+        {!overlay && (
+          <>
+            <span className="tlchart__ann tlchart__ann--greed">▲ 極度の貪欲</span>
+            <span className="tlchart__ann tlchart__ann--fear">▼ 極度の恐怖</span>
+          </>
+        )}
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={data} margin={{ top: 10, right: 8, bottom: 6, left: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ece8e1" />
             <XAxis
               dataKey="date"
-              tick={{ fill: "#6b7280", fontSize: 11 }}
-              minTickGap={40}
+              tickFormatter={monthTick}
+              minTickGap={70}
+              tick={{ fill: AXIS_COLOR, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#e2e5ea" }}
+              axisLine={{ stroke: "#e0dcd4" }}
             />
             <YAxis
               yAxisId="score"
+              orientation="right"
               domain={[0, 100]}
-              ticks={[0, 25, 45, 55, 75, 100]}
-              tick={{ fill: "#6b7280", fontSize: 11 }}
+              ticks={[0, 25, 50, 75, 100]}
+              tick={{ fill: AXIS_COLOR, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#e2e5ea" }}
-              width={32}
+              axisLine={false}
+              width={34}
             />
-            {hasIndex && (
+            {overlay && (
               <YAxis
                 yAxisId="idx"
-                orientation="right"
+                orientation="left"
                 domain={["auto", "auto"]}
                 tick={{ fill: INDEX_COLOR, fontSize: 11 }}
                 tickFormatter={(v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 tickLine={false}
-                axisLine={{ stroke: "#e2e5ea" }}
-                width={48}
+                axisLine={false}
+                width={44}
               />
             )}
-            <Tooltip content={makeTooltip(indexLabel)} />
-            {/* 指数ライン（背面） */}
-            {hasIndex && (
+            <Tooltip content={makeTooltip(overlay, indexLabel)} />
+            {overlay && (
               <Line
                 yAxisId="idx"
                 type="monotone"
                 dataKey="index"
                 stroke={INDEX_COLOR}
                 strokeWidth={1.5}
-                strokeOpacity={0.85}
+                strokeOpacity={0.9}
                 dot={false}
                 isAnimationActive={false}
                 connectNulls
               />
             )}
-            {/* スコアライン（前面） */}
             <Line
               yAxisId="score"
               type="monotone"
               dataKey="score"
-              stroke="#1a1d21"
-              strokeWidth={2}
+              stroke={LINE_COLOR}
+              strokeWidth={1.7}
               dot={false}
               isAnimationActive={false}
             />
