@@ -506,14 +506,18 @@ def _provide_new_high_low(config: Config, client, series: dict, errors: dict) ->
             raise FetchError("new_high_low: 終値キャッシュ空（初回は数回の実行で積み増し）")
 
         piv = cache.pivot_table(index="date", columns="code", values="adjc").sort_index()
-        win = 252
-        roll_max = piv.rolling(win, min_periods=win).max()
-        roll_min = piv.rolling(win, min_periods=win).min()
+        # 52週高安。日本市場は年間約245営業日のため窓は245（米国基準の252だと1年貯めても
+        # 到達せず計算不能になる）。min_periods は約40週分あれば52週高安を近似計算し、
+        # 期間が貯まるほど本来の52週窓に近づく（キャッシュ増分に対して堅牢）。
+        win = 245
+        minp = 200
+        roll_max = piv.rolling(win, min_periods=minp).max()
+        roll_min = piv.rolling(win, min_periods=minp).min()
         new_high = (piv >= roll_max) & roll_max.notna()
         new_low = (piv <= roll_min) & roll_min.notna()
         net = (new_high.sum(axis=1) - new_low.sum(axis=1))[roll_max.notna().any(axis=1)]
         if len(net) == 0:
-            raise FetchError("new_high_low: 52週窓の蓄積待ち（初回は数回の実行で充填）")
+            raise FetchError("new_high_low: 52週高安の蓄積待ち（約40週分の全銘柄終値が必要）")
         series["new_high_low"] = IndicatorSeries("new_high_low", net.astype(float), "jquants_v2")
     except FetchError as exc:
         errors["new_high_low"] = str(exc)
