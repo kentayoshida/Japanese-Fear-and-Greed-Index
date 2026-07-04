@@ -8,20 +8,19 @@ import IndicatorCard from "@/components/IndicatorCard";
 import FaqAccordion from "@/components/FaqAccordion";
 import GuideView from "@/components/GuideView";
 import { Latest, HistoryPoint, VariantInfo, VariantsManifest } from "@/lib/fgi";
+import { Lang, LangContext, t, variantTab, indicatorsHeading, variantLabel } from "@/lib/i18n";
 
-// 静的 JSON は GitHub Actions の日次 cron が再生成・コミットする。
 async function loadJson<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`${path}: ${res.status}`);
   return (await res.json()) as T;
 }
 
-// レガシー（マニフェスト未生成）を表す擬似キー。latest.json/history.json を読む。
 const LEGACY = "__legacy__";
-
 type Graph = "overview" | "timeline";
 
 export default function Page() {
+  const [lang, setLang] = useState<Lang>("ja");
   const [guide, setGuide] = useState(false);
   const [graph, setGraph] = useState<Graph>("overview");
   const [variants, setVariants] = useState<VariantInfo[]>([]);
@@ -29,6 +28,17 @@ export default function Page() {
   const [latest, setLatest] = useState<Latest | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("fgi-lang") : null;
+    if (saved === "en" || saved === "ja") setLang(saved);
+  }, []);
+  const changeLang = (l: Lang) => {
+    setLang(l);
+    try {
+      window.localStorage.setItem("fgi-lang", l);
+    } catch {}
+  };
 
   useEffect(() => {
     loadJson<VariantsManifest>("/data/variants.json")
@@ -60,161 +70,166 @@ export default function Page() {
   }, [active]);
 
   const topnav = (
-    <nav className="topnav" aria-label="ビュー切り替え">
-      <div className="topnav__brand">恐怖と強欲指数</div>
-      <div className="topnav__tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={!guide}
-          className={`topnav__tab${!guide ? " is-active" : ""}`}
-          onClick={() => setGuide(false)}
-        >
-          ダッシュボード
-        </button>
-        <button
-          role="tab"
-          aria-selected={guide}
-          className={`topnav__tab${guide ? " is-active" : ""}`}
-          onClick={() => setGuide(true)}
-        >
-          指標の解説
-        </button>
+    <nav className="topnav" aria-label="navigation">
+      <div className="topnav__brand">{t(lang, "brand")}</div>
+      <div className="topnav__right">
+        <div className="topnav__tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={!guide}
+            className={`topnav__tab${!guide ? " is-active" : ""}`}
+            onClick={() => setGuide(false)}
+          >
+            {t(lang, "navDashboard")}
+          </button>
+          <button
+            role="tab"
+            aria-selected={guide}
+            className={`topnav__tab${guide ? " is-active" : ""}`}
+            onClick={() => setGuide(true)}
+          >
+            {t(lang, "navGuide")}
+          </button>
+        </div>
+        <div className="lang-switch" role="group" aria-label="Language">
+          <button className={lang === "ja" ? "is-active" : ""} onClick={() => changeLang("ja")}>
+            日本語
+          </button>
+          <button className={lang === "en" ? "is-active" : ""} onClick={() => changeLang("en")}>
+            EN
+          </button>
+        </div>
       </div>
     </nav>
   );
 
+  let body: React.ReactNode;
   if (guide) {
-    return (
+    body = (
       <main className="page">
         {topnav}
         <GuideView />
       </main>
     );
-  }
-
-  if (error) {
-    return (
+  } else if (error) {
+    body = (
       <main className="page">
         {topnav}
-        <div className="empty-state">データを読み込めませんでした。<br />{error}</div>
+        <div className="empty-state">{t(lang, "loadError")}<br />{error}</div>
       </main>
     );
-  }
-
-  if (!latest) {
-    return (
+  } else if (!latest) {
+    body = (
       <main className="page">
         {topnav}
-        <div className="empty-state">読み込み中…</div>
+        <div className="empty-state">{t(lang, "loading")}</div>
       </main>
     );
-  }
+  } else {
+    const graphToggle = (
+      <div className="graph-toggle" role="tablist" aria-label="graph view">
+        <button
+          role="tab"
+          aria-selected={graph === "overview"}
+          className={`graph-toggle__btn${graph === "overview" ? " is-active" : ""}`}
+          onClick={() => setGraph("overview")}
+        >
+          {t(lang, "overview")}
+        </button>
+        <button
+          role="tab"
+          aria-selected={graph === "timeline"}
+          className={`graph-toggle__btn${graph === "timeline" ? " is-active" : ""}`}
+          onClick={() => setGraph("timeline")}
+        >
+          {t(lang, "timeline")}
+        </button>
+      </div>
+    );
 
-  const graphToggle = (
-    <div className="graph-toggle" role="tablist" aria-label="グラフ切り替え">
-      <button
-        role="tab"
-        aria-selected={graph === "overview"}
-        className={`graph-toggle__btn${graph === "overview" ? " is-active" : ""}`}
-        onClick={() => setGraph("overview")}
-      >
-        概要
-      </button>
-      <button
-        role="tab"
-        aria-selected={graph === "timeline"}
-        className={`graph-toggle__btn${graph === "timeline" ? " is-active" : ""}`}
-        onClick={() => setGraph("timeline")}
-      >
-        推移
-      </button>
-    </div>
-  );
+    body = (
+      <main className="page">
+        {topnav}
+        <header className="hero">
+          <div className="hero__eyebrow">{t(lang, "heroEyebrow")}</div>
+          <h1 className="hero__title">{t(lang, "heroTitle")}</h1>
+          {variants.length > 1 && (
+            <div className="variant-tabs" role="tablist" aria-label="index variant">
+              {variants.map((v) => (
+                <button
+                  key={v.key}
+                  role="tab"
+                  aria-selected={active === v.key}
+                  className={`variant-tab${active === v.key ? " is-active" : ""}`}
+                  onClick={() => setActive(v.key)}
+                >
+                  {variantTab(v.key, v.label_ja, lang)}
+                </button>
+              ))}
+            </div>
+          )}
+          {latest.sample && <div className="notice notice--sample">{t(lang, "sample")}</div>}
+        </header>
 
-  return (
-    <main className="page">
-      {topnav}
-      <header className="hero">
-        <div className="hero__eyebrow">恐怖と強欲指数（日本株版）</div>
-        <h1 className="hero__title">いま市場を動かしている感情は？</h1>
-        {variants.length > 1 && (
-          <div className="variant-tabs" role="tablist" aria-label="指数版の切り替え">
-            {variants.map((v) => (
-              <button
-                key={v.key}
-                role="tab"
-                aria-selected={active === v.key}
-                className={`variant-tab${active === v.key ? " is-active" : ""}`}
-                onClick={() => setActive(v.key)}
-              >
-                {v.label_ja}版
-              </button>
-            ))}
-          </div>
-        )}
-        {latest.sample && (
-          <div className="notice notice--sample">
-            ⚠ これはサンプル（合成データ）です。実データソース（J-Quants 等）を結線すると本番値に切り替わります。
-          </div>
-        )}
-      </header>
+        <section className="graphpanel">
+          <div className="graphpanel__head">{graphToggle}</div>
 
-      {/* グラフパネル：右上トグルで ゲージ(概要) ⇄ ラインチャート(推移) を切替。
-          下部の構成指標カードは常に表示（切替の影響を受けない）。 */}
-      <section className="graphpanel">
-        <div className="graphpanel__head">{graphToggle}</div>
-
-        {graph === "overview" ? (
-          <div className="overview">
-            <div className="overview__gauge">
-              <Gauge score={latest.score} />
-              <div className="hero__meta">
-                <span>基準日 {latest.as_of}</span>
-                <span className="dot">•</span>
-                <span>採用指標 {latest.coverage}/{latest.n_indicators}</span>
-                {typeof latest.index_value === "number" && latest.index_label && (
-                  <>
-                    <span className="dot">•</span>
-                    <span>
-                      {latest.index_label}{" "}
-                      {latest.index_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                    </span>
-                  </>
-                )}
+          {graph === "overview" ? (
+            <div className="overview">
+              <div className="overview__gauge">
+                <Gauge score={latest.score} />
+                <div className="hero__meta">
+                  <span>{t(lang, "asOf")} {latest.as_of}</span>
+                  <span className="dot">•</span>
+                  <span>{t(lang, "coverage")} {latest.coverage}/{latest.n_indicators}</span>
+                  {typeof latest.index_value === "number" && (
+                    <>
+                      <span className="dot">•</span>
+                      <span>
+                        {variantLabel(active ?? "", latest.index_label ?? "", lang)}{" "}
+                        {latest.index_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </span>
+                    </>
+                  )}
+                  {latest.generated_at && (
+                    <>
+                      <span className="dot">•</span>
+                      <span>{t(lang, "updated")} {new Date(latest.generated_at).toLocaleString(lang === "en" ? "en-US" : "ja-JP")}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="overview__compare">
+                <ComparisonStrip history={history} />
               </div>
             </div>
-            <div className="overview__compare">
-              <ComparisonStrip history={history} />
-            </div>
+          ) : (
+            <HistoryChart history={history} indexLabel={variantLabel(active ?? "", latest.index_label ?? "", lang)} />
+          )}
+        </section>
+
+        <section className="section">
+          <h2 className="section-title">{indicatorsHeading(latest.n_indicators, lang)}</h2>
+          <div className="indicator-grid">
+            {latest.components.map((c) => (
+              <IndicatorCard key={c.id} c={c} generatedAt={latest.generated_at} />
+            ))}
           </div>
-        ) : (
-          <HistoryChart history={history} indexLabel={latest.index_label} />
-        )}
-      </section>
+        </section>
 
-      {/* 構成指標（常時表示） */}
-      <section className="section">
-        <h2 className="section-title">{latest.n_indicators}個の構成指標</h2>
-        <div className="indicator-grid">
-          {latest.components.map((c) => (
-            <IndicatorCard key={c.id} c={c} generatedAt={latest.generated_at} />
-          ))}
-        </div>
-      </section>
+        <FaqAccordion />
 
-      <FaqAccordion />
+        <footer className="footer">
+          <p className="disclaimer">{t(lang, "disclaimer")}</p>
+          {latest.generated_at && (
+            <p className="footer__gen">
+              {t(lang, "footerUpdated")}: {new Date(latest.generated_at).toLocaleString(lang === "en" ? "en-US" : "ja-JP")}
+            </p>
+          )}
+        </footer>
+      </main>
+    );
+  }
 
-      <footer className="footer">
-        <p className="disclaimer">
-          {latest.disclaimer ??
-            "本指標は情報提供目的の自作指標であり、投資助言ではありません。"}
-        </p>
-        {latest.generated_at && (
-          <p className="footer__gen">
-            最終更新: {new Date(latest.generated_at).toLocaleString("ja-JP")}
-          </p>
-        )}
-      </footer>
-    </main>
-  );
+  return <LangContext.Provider value={{ lang, setLang: changeLang }}>{body}</LangContext.Provider>;
 }

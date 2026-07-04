@@ -59,6 +59,7 @@ export type VariantsManifest = {
 export type Zone = {
   key: string;
   labelJa: string;
+  labelEn: string;
   min: number;
   max: number;
   color: string;
@@ -66,11 +67,11 @@ export type Zone = {
 
 // 色は design-tokens.css の 5ゾーン配色と一致させる。
 export const ZONES: Zone[] = [
-  { key: "extreme-fear", labelJa: "極度の恐怖", min: 0, max: 25, color: "#c0392b" },
-  { key: "fear", labelJa: "恐怖", min: 25, max: 45, color: "#e67e22" },
-  { key: "neutral", labelJa: "中立", min: 45, max: 55, color: "#e6b800" },
-  { key: "greed", labelJa: "貪欲", min: 55, max: 75, color: "#7cb342" },
-  { key: "extreme-greed", labelJa: "極度の貪欲", min: 75, max: 100, color: "#1a9850" },
+  { key: "extreme-fear", labelJa: "極度の恐怖", labelEn: "Extreme Fear", min: 0, max: 25, color: "#c0392b" },
+  { key: "fear", labelJa: "恐怖", labelEn: "Fear", min: 25, max: 45, color: "#e67e22" },
+  { key: "neutral", labelJa: "中立", labelEn: "Neutral", min: 45, max: 55, color: "#e6b800" },
+  { key: "greed", labelJa: "貪欲", labelEn: "Greed", min: 55, max: 75, color: "#7cb342" },
+  { key: "extreme-greed", labelJa: "極度の貪欲", labelEn: "Extreme Greed", min: 75, max: 100, color: "#1a9850" },
 ];
 
 export function zoneForScore(score: number): Zone {
@@ -84,8 +85,13 @@ export function colorForScore(score: number): string {
   return zoneForScore(score).color;
 }
 
-export function labelForScore(score: number): string {
-  return zoneForScore(score).labelJa;
+// 言語対応のゾーンラベル。
+export function zoneLabel(z: Zone, lang: "ja" | "en"): string {
+  return lang === "en" ? z.labelEn : z.labelJa;
+}
+
+export function labelForScore(score: number, lang: "ja" | "en" = "ja"): string {
+  return zoneLabel(zoneForScore(score), lang);
 }
 
 // 時点比較ストリップ用：history から「N営業日前に最も近い」点を拾う。

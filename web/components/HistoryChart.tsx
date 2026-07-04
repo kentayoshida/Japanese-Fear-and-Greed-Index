@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { HistoryPoint } from "@/lib/fgi";
+import { useLang, t, Lang } from "@/lib/i18n";
 
 const RANGES: { key: string; label: string; days: number | null }[] = [
   { key: "1m", label: "1M", days: 21 },
@@ -32,7 +33,7 @@ function monthTick(d: string): string {
   return d.length >= 7 ? d.slice(0, 7).replace("-", "/") : d;
 }
 
-function makeTooltip(showIndex: boolean, indexLabel: string) {
+function makeTooltip(showIndex: boolean, indexLabel: string, lang: Lang) {
   return function CustomTooltip({ active, payload }: any) {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload as HistoryPoint;
@@ -48,7 +49,7 @@ function makeTooltip(showIndex: boolean, indexLabel: string) {
           </div>
         )}
         {typeof p.coverage === "number" && (
-          <div className="chart-tooltip__cov">採用指標 {p.coverage}/8</div>
+          <div className="chart-tooltip__cov">{t(lang, "indicatorsUsed")} {p.coverage}/8</div>
         )}
       </div>
     );
@@ -62,6 +63,7 @@ export default function HistoryChart({
   history: HistoryPoint[];
   indexLabel?: string;
 }) {
+  const { lang } = useLang();
   const [range, setRange] = useState("1y");
   const [showIndex, setShowIndex] = useState(false);
   const cfg = RANGES.find((r) => r.key === range)!;
@@ -72,7 +74,7 @@ export default function HistoryChart({
   return (
     <div className="history">
       <div className="history__header">
-        <h2 className="section-title">ヒストリカル推移</h2>
+        <h2 className="section-title">{t(lang, "historyTitle")}</h2>
         <div className="history__controls">
           {hasIndex && (
             <label className="index-toggle">
@@ -81,7 +83,7 @@ export default function HistoryChart({
                 checked={showIndex}
                 onChange={(e) => setShowIndex(e.target.checked)}
               />
-              指数を重ねる
+              {t(lang, "overlayIndex")}
             </label>
           )}
           <div className="range-toggle" role="tablist" aria-label="期間切替">
@@ -104,7 +106,7 @@ export default function HistoryChart({
         <div className="chart-legend">
           <span className="chart-legend__item">
             <span className="chart-legend__swatch" style={{ background: LINE_COLOR }} />
-            F&amp;G スコア
+            {t(lang, "fgScore")}
           </span>
           <span className="chart-legend__item">
             <span className="chart-legend__swatch" style={{ background: INDEX_COLOR }} />
@@ -116,8 +118,8 @@ export default function HistoryChart({
       <div className="history__chart tlchart">
         {!overlay && (
           <>
-            <span className="tlchart__ann tlchart__ann--greed">▲ 極度の貪欲</span>
-            <span className="tlchart__ann tlchart__ann--fear">▼ 極度の恐怖</span>
+            <span className="tlchart__ann tlchart__ann--greed">{t(lang, "annGreed")}</span>
+            <span className="tlchart__ann tlchart__ann--fear">{t(lang, "annFear")}</span>
           </>
         )}
         <ResponsiveContainer width="100%" height={320}>
@@ -153,7 +155,7 @@ export default function HistoryChart({
                 width={44}
               />
             )}
-            <Tooltip content={makeTooltip(overlay, indexLabel)} />
+            <Tooltip content={makeTooltip(overlay, indexLabel, lang)} />
             {overlay && (
               <Line
                 yAxisId="idx"
@@ -181,10 +183,7 @@ export default function HistoryChart({
       </div>
 
       {data.some((d) => typeof d.coverage === "number" && d.coverage < 8) && (
-        <p className="chart-note">
-          ※ 全8指標がそろう前の期間は、その時点で入手できた少数の指標で算出しています
-          （各点の採用指標数はツールチップに表示）。指標が蓄積するほど本来の合成に近づきます。
-        </p>
+        <p className="chart-note">{t(lang, "chartNote")}</p>
       )}
     </div>
   );
