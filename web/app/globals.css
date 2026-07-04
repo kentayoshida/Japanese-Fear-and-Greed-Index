@@ -206,6 +206,12 @@ html, body {
   flex-wrap: wrap; margin-bottom: 8px;
 }
 .history__header .section-title { margin: 0; }
+.history__controls { display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.index-toggle {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: var(--fg-text-secondary); user-select: none;
+}
+.index-toggle input { accent-color: #d98a2b; width: 15px; height: 15px; cursor: pointer; }
 .range-toggle { display: inline-flex; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
 .range-btn {
   border: none; background: transparent; color: var(--muted);
