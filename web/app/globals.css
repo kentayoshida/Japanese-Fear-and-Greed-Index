@@ -225,6 +225,18 @@ html, body {
 .chart-tooltip__score { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
 .chart-tooltip__index { color: #3b6fb0; font-size: 12px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .chart-tooltip__cov { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+/* CNN Timeline 風（開いた見た目＋上下の目印） */
+.history__chart.tlchart {
+  background: transparent; border: none; box-shadow: none; padding: 8px 2px 0;
+  position: relative;
+}
+.tlchart__ann {
+  position: absolute; left: 14px; z-index: 2; pointer-events: none;
+  font-size: 11px; font-weight: 600; color: #a2937d; letter-spacing: 0.02em;
+}
+.tlchart__ann--greed { top: 66px; }
+.tlchart__ann--fear { top: 214px; }
 .chart-note { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 10px 4px 0; }
 
 /* チャート凡例（スコア / 指数の2ライン） */
