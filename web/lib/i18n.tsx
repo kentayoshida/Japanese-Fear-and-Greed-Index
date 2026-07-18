@@ -157,12 +157,12 @@ export const IND_DESC: Record<string, Bi> = {
     en: "Shows how far the index sits above or below its average level over the past ~six months (125 trading days). Above the average signals positive momentum and greed; below it means investors are getting cautious. Slowing momentum is read as fear, growing momentum as greed.",
   },
   advance_decline_25: {
-    ja: "値上がり銘柄と値下がり銘柄の数を25日ぶん累積した比率です。一部の大型株だけでなく市場全体が広く買われているかを示します。高いほど強気ですが、120%を超えると過熱（買われ過ぎ）の目安にもなります。",
-    en: "The ratio of advancing to declining stocks accumulated over 25 days. It shows whether the whole market — not just a few large caps — is broadly bid. Higher is more bullish, though above ~120% it can also flag an overheated (overbought) market.",
+    ja: "値上がり銘柄と値下がり銘柄の数を25日ぶん累積した比率です。一部の大型株だけでなく市場全体が広く買われているかを示します。高いほど強気ですが、120%を超えると過熱（買われ過ぎ）の目安にもなります。本指数では市場の幅を平滑化して捉える指標で（25日累積のため動きは緩やか）、本家CNNのブレッドス指標に相当します。直近の機敏な変化は#3「新高値 − 新安値」が担います。",
+    en: "The ratio of advancing to declining stocks accumulated over 25 days. It shows whether the whole market — not just a few large caps — is broadly bid. Higher is more bullish, though above ~120% it can also flag an overheated (overbought) market. In this index it is the smoothed breadth gauge (25-day cumulative, so it moves slowly), analogous to CNN's Stock Price Breadth; the more responsive, day-to-day signal comes from #3 (net new highs minus lows).",
   },
   new_high_low: {
-    ja: "年初来（52週）高値をつけた銘柄と安値をつけた銘柄の差です。高値の方が多ければ相場の地力が強く強気、安値が多ければ内部は崩れており弱気を示します。",
-    en: "The difference between the number of stocks hitting 52-week highs and those hitting 52-week lows. More highs than lows points to underlying strength and greed; more lows signals internal weakness and fear.",
+    ja: "年初来（52週）高値をつけた銘柄と安値をつけた銘柄の差です。高値の方が多ければ相場の地力が強く強気、安値が多ければ内部は崩れており弱気を示します。25日累積の騰落レシオ（#2）と違い日々の変化を機敏に映すため、直近の地合いはこちらがよく表します（本家CNNの Stock Price Strength に相当）。",
+    en: "The difference between the number of stocks hitting 52-week highs and those hitting 52-week lows. More highs than lows points to underlying strength and greed; more lows signals internal weakness and fear. Unlike the 25-day advance/decline ratio (#2), it reacts quickly day to day, so it better reflects the latest market tone (analogous to CNN's Stock Price Strength).",
   },
   nikkei_vi: {
     ja: "日経平均オプションから算出される今後1か月の予想変動率で、いわゆる恐怖指数です。相場が急落すると跳ね上がり、落ち着くと低下します。高いほど不安が大きく、本指数は上昇を恐怖の signal に使います。",

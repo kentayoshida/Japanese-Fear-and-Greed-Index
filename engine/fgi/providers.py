@@ -397,6 +397,34 @@ def _weekly_margin_long_cache(config: Config, client) -> pd.Series:
     return merged
 
 
+def _load_margin_pl_history() -> pd.Series:
+    """#6 信用評価損益率（買い方）の**確定日次履歴**（松井「店内信用評価損益率の推移」由来・
+    正のデータ）。engine/fgi/data/margin_pl_history.csv を読む。tier-3 の較正アンカーおよび
+    観測上書きに使う。より新しいライブ実測が同一日を上書きできるが、通常は一致する。"""
+    from pathlib import Path
+
+    p = Path(__file__).resolve().parent / "data" / "margin_pl_history.csv"
+    if not p.exists():
+        return pd.Series(dtype="float64")
+    df = pd.read_csv(p)
+    s = pd.Series(pd.to_numeric(df["value"], errors="coerce").values,
+                  index=pd.to_datetime(df["date"]))
+    return s.dropna().sort_index()
+
+
+def _merge_observed(history: pd.Series, live: pd.Series) -> pd.Series:
+    """#6 観測系列の合成：確定日次履歴（history・正）＋ 松井ライブ実測（live）。
+    履歴が収録する日付は **履歴を正として優先**し、ライブは履歴に無い日付
+    （通常は履歴期間より新しい日）だけを補う。これにより、旧ロジックで日付がズレた
+    ライブ点があっても、確定履歴の範囲内では正しい値が表示される。"""
+    if not len(history):
+        return live
+    if not len(live):
+        return history
+    # history を正として優先し、history に無い日付のみ live で補う（順序非依存）。
+    return history.combine_first(live).sort_index()
+
+
 def _provide_margin_pl(config: Config, client, series: dict, errors: dict,
                        scrape_latest: bool = True) -> None:
     """#6 信用評価損益率（買い方）。仕様 §2 の三層構成：
@@ -406,8 +434,6 @@ def _provide_margin_pl(config: Config, client, series: dict, errors: dict,
     松井が取れなくても MTM で継続、MTM が組めなくても松井のみで継続する。
     #6 は市場全体の指標のため全版共通。scrape_latest=False の版はキャッシュを再利用し
     松井への再アクセスを避ける（ToS：取得は日次1回に限る）。"""
-    from datetime import datetime, timedelta
-
     from .fetchers.derive import margin_pl_mtm
 
     # --- tier-1: 松井（正）。取得できたら observed 系列(margin_pl_ratio.csv)に蓄積 ---
@@ -417,13 +443,27 @@ def _provide_margin_pl(config: Config, client, series: dict, errors: dict,
         try:
             from .fetchers.matsui import fetch_margin_pl_buy
 
-            value = fetch_margin_pl_buy()
-            as_of = pd.Timestamp((datetime.utcnow() + timedelta(hours=9)).date())
-            matsui = pd.concat([matsui, pd.Series({as_of: float(value)})]).sort_index()
-            matsui = matsui[~matsui.index.duplicated(keep="last")]
-            _save_series_cache(matsui_path, matsui)
+            value, basis = fetch_margin_pl_buy()
+            # 松井は評価損益率を「翌営業日公開」（祝日で更に遅延）するため、実行日ではなく
+            # ページ表示の基準日でキーする（データ本来の日付に付与＝自己修復型）。
+            # 基準日を読めなかった場合は日付を推測せず、その回の格納は見送る（捏造しない）。
+            if basis is None:
+                errors.setdefault(
+                    "margin_pl_ratio_matsui",
+                    "matsui: 基準日を読み取れず（値の格納を見送り。tier-2 で継続）",
+                )
+            else:
+                as_of = pd.Timestamp(pd.Timestamp(basis).date())
+                new_pt = pd.Series({as_of: float(value)})
+                # 同一基準日は新しい実測で上書き（combine_first で順序非依存）。
+                matsui = new_pt.combine_first(matsui).sort_index()
+                _save_series_cache(matsui_path, matsui)
         except Exception as exc:  # noqa: BLE001  松井不通でも tier-2 で継続
             errors.setdefault("margin_pl_ratio_matsui", f"matsui: {exc}")
+
+    # --- 観測系列 = 確定日次履歴（松井チャート由来・正）＋ 松井ライブ実測（最新・上書き）---
+    history = _load_margin_pl_history()
+    observed = _merge_observed(history, matsui)
 
     # --- tier-2: 週次買い残 × 指数の MTM 近似（J-Quants 未設定時はスキップ）---
     mtm = None
@@ -436,27 +476,29 @@ def _provide_margin_pl(config: Config, client, series: dict, errors: dict,
         except Exception as exc:  # noqa: BLE001
             errors.setdefault("margin_pl_ratio_mtm", f"mtm: {exc}")
 
-    # --- tier-3: 較正して合成（観測日は実測で上書き）---
+    # --- tier-3: 較正して合成（観測日は観測=正で上書き、他日は較正MTMで補完）---
     final = None
     if mtm is not None and len(mtm):
         cal = mtm
-        if len(matsui):
-            common = mtm.index.intersection(matsui.index)
+        if len(observed):
+            common = mtm.index.intersection(observed.index)
             if len(common):
-                offset = float((matsui.reindex(common) - mtm.reindex(common)).median())
+                offset = float((observed.reindex(common) - mtm.reindex(common)).median())
                 cal = mtm + offset
-        if len(matsui):
-            final = pd.concat([cal, matsui]).sort_index()
-            final = final[~final.index.duplicated(keep="last")]  # matsui(後勝ち)で上書き
+        if len(observed):
+            # observed(正)を優先し、観測が無い日は較正MTMで補完（combine_first で順序非依存）。
+            final = observed.combine_first(cal).sort_index()
         else:
             final = cal
-    elif len(matsui):
-        final = matsui  # MTM 不可なら松井のみ（従来動作）
+    elif len(observed):
+        final = observed  # MTM 不可なら観測(履歴＋松井ライブ)のみ
 
     if final is None or len(final) == 0:
-        errors["margin_pl_ratio"] = "margin_pl_ratio: 松井・MTM いずれも取得できず"
+        errors["margin_pl_ratio"] = "margin_pl_ratio: 松井・履歴・MTM いずれも取得できず"
         return
     src = "matsui+mtm" if (mtm is not None and len(mtm)) else "matsui"
+    if len(history):
+        src += "+hist"
     series["margin_pl_ratio"] = IndicatorSeries("margin_pl_ratio", final, src)
 
 

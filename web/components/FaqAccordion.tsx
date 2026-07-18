@@ -34,6 +34,16 @@ const FAQ: { q: { ja: string; en: string }; a: { ja: string; en: string } }[] = 
     },
   },
   {
+    q: {
+      ja: "騰落レシオ（市場の幅）が遅れて感じるのはなぜですか？",
+      en: "Why does the advance/decline ratio (breadth) feel laggy?",
+    },
+    a: {
+      ja: "騰落レシオ（#2）は値上がり/値下がり銘柄数を25日ぶん累積するため、意図的に平滑化された「市場の幅」の指標で、動きは緩やかです。これは本家CNNの設計と同じ考え方で、CNNのブレッドス指標（McClellan Volume Summation Index）は累積・約2年レンジで比較する、さらに平滑化された指標です。直近の機敏な変化は、CNNの Stock Price Strength に相当する #3「新高値 − 新安値」が日々の地合いとして捉えます。両者で役割を分担しています。",
+      en: "The advance/decline ratio (#2) accumulates advancing/declining counts over 25 days, so it is a deliberately smoothed 'breadth' gauge that moves slowly. This matches CNN's design: CNN's breadth component (the McClellan Volume Summation Index) is a cumulative measure compared against a ~2-year range and is even more smoothed. The responsive, day-to-day signal is handled by #3 (net new 52-week highs minus lows), which corresponds to CNN's Stock Price Strength. The two play complementary roles.",
+    },
+  },
+  {
     q: { ja: "TOPIX版と日経225版の違いは？", en: "What is the difference between the TOPIX and Nikkei 225 versions?" },
     a: {
       ja: "勢い（#1 モメンタム）と安全資産選好（#8）に使う株価指数だけを、TOPIX または 日経平均に差し替えた2つの版です。指数の値動きの寄与が異なるため、同じ日でもスコアが違うことがあります。その他の指標（市場の幅・ボラティリティ・ヘッジ・個人心理）は両版で共通です。",
