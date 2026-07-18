@@ -34,6 +34,10 @@ _UA = (
 # 基準日の許容範囲（今日から何日前まで遡って妥当とみなすか）。祝日連休でも 45 日あれば十分。
 _MAX_BASIS_AGE_DAYS = 45
 
+# 見出し（テーブル本体より早く安定描画される）の出現待ち上限。見出しは通常数秒で出るため、
+# ここで頭打ちにして、完全ブロック時は買い残行の満額待ちに入る前に早めに失敗→次リトライへ。
+_HEADING_TIMEOUT_MS = 20000
+
 
 def _parse_pl(text: str | None) -> float:
     """『買い残』行の評価損益率セル文字列から数値(%)を取り出して検証する。"""
@@ -153,16 +157,31 @@ def _basis_date_from_page(page) -> pd.Timestamp | None:
     return None
 
 
+def _wait_for_heading(page, timeout_ms: int) -> None:
+    """テーブル本体より早く安定描画される見出しの出現を待つ（段階待ちの前段）。
+
+    「信用取引指標」または「信用残速報」のいずれかが出れば通過。買い残行を直接待つ前に
+    ここを挟むことで、描画が進んでいるかを早期に判定でき、ページ全体がブロック/未描画の
+    ときは満額の行待ちに入らず早めに失敗して次リトライへ回せる。
+    """
+    page.wait_for_selector(
+        "xpath=//*[contains(text(),'信用取引指標') or contains(text(),'信用残速報')]",
+        timeout=timeout_ms,
+    )
+
+
 def _scrape_once(
     browser, selector_timeout_ms: int, goto_timeout_ms: int
 ) -> tuple[float, pd.Timestamp | None]:
     """1回ぶんの取得。『買い残』行の評価損益率(%)と、ページ上の基準日を返す。"""
     # ※ 松井ページは分析タグが常時通信し networkidle に到達しないため使わない。
-    #   DOM 構築後にテーブル行の出現を明示的に待つ。
+    #   load（全リソース読込完了）まで待ってから、見出し→テーブル行の順に段階的に待つ。
     context = browser.new_context(user_agent=_UA)
     try:
         page = context.new_page()
-        page.goto(URL, wait_until="domcontentloaded", timeout=goto_timeout_ms)
+        page.goto(URL, wait_until="load", timeout=goto_timeout_ms)
+        # まず見出し（早く安定描画される）を待ち、描画が進んでいることを確認してから
+        _wait_for_heading(page, min(selector_timeout_ms, _HEADING_TIMEOUT_MS))
         # 「買い残」を含む行（信用残速報テーブル）が描画されるまで待つ
         page.wait_for_selector("tr:has-text('買い残')", timeout=selector_timeout_ms)
         row = page.locator("tr", has_text="買い残").first
