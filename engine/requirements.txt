@@ -4,3 +4,4 @@ PyYAML>=6.0
 requests>=2.31
 openpyxl>=3.1   # xlsx 読み込み用
 playwright>=1.44  # #6 松井『投資指標(店内)』のヘッドレス描画抽出（ブラウザは別途 install）
+tweepy>=4.14      # 日次スコアの X（Twitter）自動投稿（post_to_x.py）

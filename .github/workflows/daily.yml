@@ -47,6 +47,9 @@ jobs:
         working-directory: engine
         run: python -m playwright install --with-deps chromium
 
+      - name: 日本語フォント（X投稿画像の日本語描画用）
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+
       - name: スコア再生成
         working-directory: engine
         run: |
@@ -74,4 +77,41 @@ jobs:
             exit 1
           else
             echo "変更なし。コミットをスキップします。"
+          fi
+
+      - name: X（Twitter）へ日次スコアを投稿
+        working-directory: engine
+        env:
+          # 認証情報は GitHub Secrets で設定（コードに直書きしない §6）。
+          # 未設定でも post_to_x.py は投稿せず正常終了するため、設定前でも安全。
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          # サイトURL（Variables 推奨）。未設定ならURL無しで投稿する。
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: python scripts/post_to_x.py --variant nikkei225
+
+      - name: 投稿状態ファイルをコミット（重複投稿ガード）
+        run: |
+          state="web/public/data/x_last_posted.json"
+          if [ -n "$(git status --porcelain "$state")" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$state"
+            git commit -m "chore(x): 投稿状態を更新 ($(date +%Y-%m-%d))"
+            branch="${GITHUB_REF_NAME}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin "HEAD:${branch}"; then
+                echo "push 成功（試行 ${attempt}）"; exit 0
+              fi
+              echo "push 失敗（試行 ${attempt}）。fetch + rebase して再試行します。"
+              git fetch origin "${branch}"
+              git rebase "origin/${branch}" || { git rebase --abort; exit 1; }
+              sleep $((attempt * 2))
+            done
+            echo "push を複数回試行しましたが失敗しました。" >&2
+            exit 1
+          else
+            echo "投稿状態に変更なし（未投稿 or 同一 as_of）。コミットをスキップします。"
           fi
