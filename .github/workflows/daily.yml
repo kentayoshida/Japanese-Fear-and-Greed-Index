@@ -81,6 +81,9 @@ jobs:
 
       - name: X（Twitter）へ日次スコアを投稿
         working-directory: engine
+        # X の投稿失敗（API課金/クレジット・一時的な障害など）でデータ再生成・サイト更新
+        # 本体まで赤くしない。投稿はベストエフォート扱いにし、クレジット整備後に自動復帰する。
+        continue-on-error: true
         env:
           # 認証情報は GitHub Secrets で設定（コードに直書きしない §6）。
           # 未設定でも post_to_x.py は投稿せず正常終了するため、設定前でも安全。
