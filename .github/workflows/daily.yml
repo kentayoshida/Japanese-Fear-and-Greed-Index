@@ -88,8 +88,8 @@ jobs:
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
-          # サイトURL（Variables 推奨）。未設定ならURL無しで投稿する。
-          SITE_URL: ${{ vars.SITE_URL }}
+          # サイトURL。Variables `SITE_URL` を設定すればそれを使い、未設定なら既定値を使う。
+          SITE_URL: ${{ vars.SITE_URL || 'https://jfgi.markets-lab.com/' }}
         run: python scripts/post_to_x.py --variant nikkei225
 
       - name: 投稿状態ファイルをコミット（重複投稿ガード）

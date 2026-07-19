@@ -58,11 +58,12 @@
 | `X_ACCESS_TOKEN` | Access Token |
 | `X_ACCESS_SECRET` | Access Token Secret |
 
-**Variables（Repository variables）** に 1 つ（任意だが推奨。投稿本文と画像フッターの URL）：
+**Variables（Repository variables）** — 任意。投稿本文と画像フッターに出す URL。
+**未設定でも既定値 `https://jfgi.markets-lab.com/` が使われる**ので、URL を変えたい場合だけ設定する：
 
 | Variable 名 | 値（例） |
 | --- | --- |
-| `SITE_URL` | `https://<あなたのサイト>` |
+| `SITE_URL` | `https://jfgi.markets-lab.com/` |
 
 ## 4. 動作確認
 
