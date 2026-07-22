@@ -68,7 +68,7 @@ const INDICATORS: Doc[] = [
     name: { ja: "信用評価損益率（買い方）", en: "Margin trading P/L ratio (long)" },
     dim: { ja: "レバレッジ / 個人心理", en: "Leverage & Retail Sentiment" },
     measures: { ja: "信用取引で株を買っている個人投資家が、平均でどれだけ含み益/含み損かの割合。個人の楽観・悲観の温度計。", en: "The average unrealized profit/loss of retail investors holding stocks on margin — a thermometer of retail optimism vs. pessimism." },
-    source: { ja: "松井証券「投資指標（店内）」の最新値（正）＋ J-Quants の週次信用買い残から推計した過去分（三層構成・下記）。", en: "Matsui Securities' latest published value (authoritative) plus history estimated from J-Quants weekly margin balances (three-tier design, below)." },
+    source: { ja: "松井証券「投資指標（店内）」の最新値（正）＋ J-Quants の週次信用買い残から推計した過去分（三層構成・下記）。松井証券は評価損益率を翌営業日に公表するため、当日分は推計値で表示し、翌営業日に松井証券の公表値で自動的に上書きされる。", en: "Matsui Securities' latest published value (authoritative) plus history estimated from J-Quants weekly margin balances (three-tier design, below). Because Matsui publishes each day's P/L ratio on the next business day, the current day is shown as an estimate and is automatically overwritten with Matsui's published value on the following business day." },
     calc: { ja: "評価損益率(%)。おおむね 0%近辺で楽観、−20%以下で強い悲観。アンカー（-30→0, -20→20, -10→50, 0→100）で0-100化。", en: "P/L ratio (%). Roughly 0% is optimistic; −20% or lower is strong pessimism. Mapped to 0–100 via anchors (−30→0, −20→20, −10→50, 0→100)." },
     high: { ja: "高い（含み損が浅い/含み益）＝個人が強気。低い（含み損が深い）＝個人の恐怖。", en: "Higher (shallow loss or a gain) = retail greed. Lower (deep loss) = retail fear." },
   },
