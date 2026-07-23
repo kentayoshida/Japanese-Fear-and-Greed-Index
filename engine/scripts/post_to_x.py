@@ -70,11 +70,11 @@ def build_tweet_text(latest: dict, site_url: str) -> str:
         lines.append(f"{index_label}: {index_value:,.2f}")
     if site_url:
         lines += ["", f"詳しく見る → {site_url}"]
-    tail = "\n\n※情報提供目的の自作指標です（投資助言ではありません）\n#日本株 #日経平均 #FearAndGreed"
+    tail = "\n\n#日本株 #日経平均 #FearAndGreed"
 
     text = "\n".join(lines) + tail
     if _weighted_len(text) > 280:  # 収まらなければハッシュタグ行を落とす
-        text = "\n".join(lines) + "\n\n※情報提供目的の自作指標です（投資助言ではありません）"
+        text = "\n".join(lines)
     return text
 
 
