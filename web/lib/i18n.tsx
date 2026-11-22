@@ -169,8 +169,8 @@ export const IND_DESC: Record<string, Bi> = {
     en: "Implied volatility for the next month derived from Nikkei 225 options — the market's 'fear gauge.' It spikes when the market sells off and falls when things calm down. Higher readings mean more anxiety, so rising volatility is read as fear.",
   },
   put_call_ratio: {
-    ja: "下落に備える保険であるプットが、上昇に賭けるコールに対してどれだけ買われているかの比率です。1を超えると弱気とされ、上昇するほど投資家が神経質になっているサイン。本指数は高い比率を恐怖の signal に使います。",
-    en: "How much downside insurance (puts) is being bought relative to upside bets (calls). A ratio above 1 is considered bearish, and a rising ratio shows investors are getting nervous. A higher put/call ratio is read as fear.",
+    ja: "下落に備える保険であるプットが、上昇に賭けるコールに対してどれだけ売買されているかの比率（出来高ベース）です。日経225オプションはヘッジ目的のプット取引が常に多いため、比率は平常時でも1を大きく上回るのが普通です。そのため本指数では「1を超えたら弱気」といった絶対水準ではなく、過去1年（252営業日）の中での相対的な位置で評価し、普段より高ければ恐怖、低ければ強欲と判定します。日々の振れが大きい指標なので、単日の値より数日間の傾向で見るのがおすすめです。",
+    en: "The ratio of put volume (downside insurance) to call volume (upside bets) in Nikkei 225 options. Because hedging demand keeps put trading structurally heavy in Japan, the ratio normally sits well above 1. This index therefore does not use an absolute cutoff such as \"above 1 is bearish\"; instead it scores the ratio against its own past year (252 trading days) — higher than usual is read as fear, lower than usual as greed. The daily reading is noisy, so the multi-day trend is more informative than any single day.",
   },
   short_selling_ratio: {
     ja: "売買代金に占める空売り（下落に賭ける売り）の割合です。高いほど弱気・ヘッジ姿勢が強いことを示します。本指数は空売り比率の上昇を恐怖の signal に使います。",

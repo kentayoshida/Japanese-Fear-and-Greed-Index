@@ -74,7 +74,7 @@ indicators:
     dimension: hedge_positioning
     method: percentile
     inverted: true   # 高P/C = 恐怖（ヘッジ需要）
-    description_ja: "プット出来高÷コール出来高。高いほど下落ヘッジ需要が強い（反転）。"
+    description_ja: "プット出来高÷コール出来高。日経225は平常時でも1超が普通のため、過去1年の中での相対水準で評価（高いほど恐怖＝反転）。"
 
   - id: margin_pl_ratio
     label_ja: "信用評価損益率（買い方）"
