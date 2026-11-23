@@ -4104,7 +4104,7 @@
       "weight": 0.083333,
       "inverted": true,
       "stale": false,
-      "description": "プット出来高÷コール出来高。高いほど下落ヘッジ需要が強い（反転）。",
+      "description": "プット出来高÷コール出来高。日経225は平常時でも1超が普通のため、過去1年の中での相対水準で評価（高いほど恐怖＝反転）。",
       "data_date": "2026-11-20",
       "series": [
         {
@@ -8186,7 +8186,7 @@
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-11-22T02:40:39.118846+00:00",
+  "generated_at": "2026-11-23T01:18:28.967027+00:00",
   "mode": "real",
   "variant": "topix",
   "variant_label": "TOPIX",
