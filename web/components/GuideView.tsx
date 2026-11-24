@@ -47,12 +47,12 @@ const INDICATORS: Doc[] = [
   },
   {
     no: 5,
-    name: { ja: "日経225オプション Put/Call レシオ", en: "Nikkei 225 options put/call ratio" },
+    name: { ja: "日経225オプション スキュー（下落ヘッジ需要）", en: "Nikkei 225 options skew (downside-hedge demand)" },
     dim: { ja: "ヘッジ / ポジショニング", en: "Hedging & Positioning" },
-    measures: { ja: "下落に備える「保険」（プット）がどれだけ買われているか。投資家の警戒度。", en: "How much downside 'insurance' (puts) is being bought — investors' level of caution." },
-    source: { ja: "J-Quants の日経225オプション四本値（出来高）。", en: "Nikkei 225 option OHLC (volume) via J-Quants." },
-    calc: { ja: "その日のプット出来高 ÷ コール出来高。", en: "Daily put volume ÷ call volume." },
-    high: { ja: "高い＝下落ヘッジ需要が強い＝Fear。反転して合成。", en: "High = strong downside-hedging demand = fear. Inverted in the composite." },
+    measures: { ja: "下落に備える「保険」（プット）の保険料が、上昇に賭けるコールに比べてどれだけ割高か。投資家の警戒度。", en: "How expensive downside 'insurance' (puts) is relative to upside calls — investors' level of caution." },
+    source: { ja: "J-Quants の日経225オプション四本値（インプライド・ボラティリティ）。", en: "Nikkei 225 option OHLC (implied volatility) via J-Quants." },
+    calc: { ja: "期近限月（SQまで7日以上）で、原資産の約5%下のプットのIV − 約5%上のコールのIV（%ポイント）を、5営業日で単純平均。", en: "Front-month (≥7 days to SQ) IV of the put ~5% below spot minus the IV of the call ~5% above, in percentage points, averaged over 5 trading days." },
+    high: { ja: "高い＝プットが割高＝下落ヘッジ需要が強い＝Fear。反転して合成。", en: "High = puts are expensive = strong downside-hedging demand = fear. Inverted in the composite." },
   },
   {
     no: 7,
@@ -100,7 +100,7 @@ const G: Record<Lang, any> = {
     norm: [
       "パーセンタイル方式：直近約1年（245〜252営業日）の中で、今日の値が何％の位置にあるかで 0〜100 に変換。分布の形を仮定せず外れ値に強い方式です。",
       "アンカー方式：騰落レシオや信用評価損益率のように「経験的な目安（しきい値）」がある指標は、固定の基準点（例：信用評価損益率 −30%→0点、0%→100点）で変換します。",
-      "反転：日経VI・P/Cレシオ・空売り比率は「高い＝恐怖」なので、スコア化後に100から引いて向きをそろえます。",
+      "反転：日経VI・オプション・スキュー・空売り比率は「高い＝恐怖」なので、スコア化後に100から引いて向きをそろえます。",
       "point-in-time（先読み防止）：過去の各日について、その日までに実際に入手できたデータだけで計算します。未来の情報は使いません。",
     ],
     hVer: "TOPIX版 と 日経225版",

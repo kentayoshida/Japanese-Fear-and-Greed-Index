@@ -67,6 +67,74 @@ def put_call_ratio(
     return ratio.sort_index()
 
 
+def option_skew_daily(
+    option_df: pd.DataFrame,
+    *,
+    otm_pct: float = 0.05,
+    min_days_to_sq: int = 7,
+) -> tuple[float, float, float] | None:
+    """#5 日経225オプション・スキュー（1営業日ぶん）。(put_iv, call_iv, raw) を返す。
+
+    option_df は J-Quants v2 /derivatives/bars/daily/options/225 の「1日分・全ストライク」。
+    v2 カラム: 'Date', 'EmMrgnTrgDiv', 'UnderPx'(原資産), 'SQD'(SQ日), 'CM'(限月),
+               'PCDiv'(1=Put/2=Call), 'Strike', 'IV'。
+
+    手順（実装指示 #5）:
+      1. EmMrgnTrgDiv == "002" の行だけを使う（緊急取引証拠金発動日の二重収録を除外）
+      2. 原資産 U = UnderPx
+      3. 期近限月 = SQD > 当日 の最も近い CM。SQ までの残りが min_days_to_sq 暦日未満なら次の限月へ
+      4. 期近・プットで Strike が U×(1-otm_pct) に最も近い銘柄の IV → put_iv
+      5. 期近・コールで Strike が U×(1+otm_pct) に最も近い銘柄の IV → call_iv（IV>0 の行のみ）
+      6. raw = put_iv − call_iv（%ポイント）
+    算出できない日（IV 欠損・限月なし等）は None（呼び出し側でスキップ＝中立値で埋めない §8）。
+    """
+    df = option_df.copy()
+    if df.empty or "Date" not in df.columns:
+        return None
+    if "EmMrgnTrgDiv" in df.columns:
+        df = df[df["EmMrgnTrgDiv"].astype(str) == "002"]
+    for col in ("Strike", "IV", "UnderPx"):
+        if col not in df.columns:
+            return None
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["SQD"] = pd.to_datetime(df["SQD"], errors="coerce")
+    df = df.dropna(subset=["Date", "SQD", "Strike", "UnderPx"])
+    if df.empty:
+        return None
+    day = df["Date"].max()
+    df = df[df["Date"] == day]
+
+    # 期近限月：SQD > 当日 の限月をSQ日の近い順に並べ、残り7暦日以上の最初を採る
+    cm_sqd = df[df["SQD"] > day].groupby("CM")["SQD"].min().sort_values()
+    front = next((cm for cm, sqd in cm_sqd.items() if (sqd - day).days >= min_days_to_sq), None)
+    if front is None:
+        return None
+    fd = df[df["CM"] == front]
+    under = float(fd["UnderPx"].median())
+    if not under > 0:
+        return None
+
+    def _nearest_iv(pc: str, target: float) -> float | None:
+        sub = fd[(fd["PCDiv"].astype(str) == pc) & (fd["IV"] > 0)]
+        if sub.empty:
+            return None
+        sub = sub.assign(_d=(sub["Strike"] - target).abs()).sort_values(["_d", "Strike"])
+        return float(sub.iloc[0]["IV"])
+
+    put_iv = _nearest_iv("1", under * (1 - otm_pct))
+    call_iv = _nearest_iv("2", under * (1 + otm_pct))
+    if put_iv is None or call_iv is None:
+        return None
+    return put_iv, call_iv, put_iv - call_iv
+
+
+def smooth_option_skew(raw: pd.Series, window: int = 5) -> pd.Series:
+    """日次スキュー raw の window 営業日単純平均（window 本そろった日のみ）。"""
+    r = pd.to_numeric(raw, errors="coerce").sort_index()
+    return r.rolling(window=window, min_periods=window).mean().dropna()
+
+
 def short_selling_market_ratio(
     df: pd.DataFrame,
     *,

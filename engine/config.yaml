@@ -22,7 +22,7 @@ bands:
 # 採用指標で再正規化される（compose 時）。すべて上書き可能。
 #
 # 仕様の不整合（§2 の8指標 vs §4.1 の6次元）への確定対応（Ken 回答）：
-#   #5 P/Cレシオ と #7 空売り比率 を同一の「ヘッジ／ポジショニング」次元
+#   #5 オプション・スキュー と #7 空売り比率 を同一の「ヘッジ／ポジショニング」次元
 #   (hedge_positioning) に束ねて 6次元を維持する。結果：
 #     momentum 1/6, volatility 1/6, leverage 1/6, safe_haven 1/6,
 #     breadth の2指標 各1/12, hedge_positioning の2指標 各1/12 → 合計 1.0
@@ -69,12 +69,12 @@ indicators:
     inverted: true   # 高VI = 恐怖
     description_ja: "日経平均の予想変動率。高いほど投資家の不安が大きい（反転）。"
 
-  - id: put_call_ratio
-    label_ja: "日経225オプション Put/Call レシオ"
+  - id: option_skew
+    label_ja: "日経225オプション スキュー（下落ヘッジ需要）"
     dimension: hedge_positioning
     method: percentile
-    inverted: true   # 高P/C = 恐怖（ヘッジ需要）
-    description_ja: "プット出来高÷コール出来高。日経225は平常時でも1超が普通のため、過去1年の中での相対水準で評価（高いほど恐怖＝反転）。"
+    inverted: true   # 高スキュー = 恐怖（プットが割高 = 下落ヘッジ需要）
+    description_ja: "期近5%OTMプットIV − コールIV（5日平均）。広いほど下落ヘッジ需要が強い（反転）。"
 
   - id: margin_pl_ratio
     label_ja: "信用評価損益率（買い方）"
@@ -87,7 +87,7 @@ indicators:
 
   - id: short_selling_ratio
     label_ja: "空売り比率（東証）"
-    dimension: hedge_positioning   # #5 P/Cレシオと同一次元に束ねて6次元を維持（dimensions注記参照）
+    dimension: hedge_positioning   # #5 スキューと同一次元に束ねて6次元を維持（dimensions注記参照）
     method: percentile
     inverted: true   # 高い空売り比率 = 恐怖（反転）
     description_ja: "売買代金に占める空売りの比率。高いほどヘッジ/弱気姿勢が強い（反転）。"
@@ -103,7 +103,7 @@ indicators:
 # 版（バリアント）
 # 株式指数レッグ（#1 モメンタム・#8 セーフヘイブンの株式側）を差し替えて
 # 複数版を同時出力する。市場全体系の指標（#2 騰落・#3 新高安・#4 日経VI・
-# #5 P/C・#6 信用評価損益率・#7 空売り）は全版で共通。
+# #5 スキュー・#6 信用評価損益率・#7 空売り）は全版で共通。
 #   default: true の版は latest.json / history.json も兼ねる（後方互換）。
 #   各版は latest.<key>.json / history.<key>.json に出力し、variants.json に一覧を書く。
 # equity.min/max は指数価格の異常値検知レンジ（版ごとに水準が違うため個別指定）。

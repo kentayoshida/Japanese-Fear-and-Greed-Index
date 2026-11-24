@@ -21,7 +21,7 @@ def test_breadth_and_hedge_split_1_12():
     w = base_weights(cfg)
     assert abs(w["advance_decline_25"] - 1 / 12) < 1e-4
     assert abs(w["new_high_low"] - 1 / 12) < 1e-4
-    assert abs(w["put_call_ratio"] - 1 / 12) < 1e-4
+    assert abs(w["option_skew"] - 1 / 12) < 1e-4
     assert abs(w["short_selling_ratio"] - 1 / 12) < 1e-4
     # 単独次元は 1/6
     assert abs(w["momentum_125dma"] - 1 / 6) < 1e-4
@@ -44,7 +44,7 @@ def test_partial_dimension_drop_keeps_dimension_weight():
     # §4.1b: ヘッジ次元(2指標)の片方 #5 が欠損しても、次元重みは縮まず #7 に集約。
     cfg = _cfg()
     all_ids = [i.id for i in cfg.indicators]
-    ids = [i for i in all_ids if i != "put_call_ratio"]  # #5 のみ欠損
+    ids = [i for i in all_ids if i != "option_skew"]  # #5 のみ欠損
     w = available_weights(cfg, ids)
     assert abs(sum(w.values()) - 1.0) < 1e-9
     # 全次元が残る（hedge_positioning は #7 のみ採用）→ 6次元均等 = 各1/6
@@ -63,7 +63,7 @@ def test_dimension_drop_renormalizes_to_five():
     assert abs(sum(w.values()) - 1.0) < 1e-9
     assert abs(w["momentum_125dma"] - 1 / 5) < 1e-9
     assert abs(w["advance_decline_25"] - 1 / 10) < 1e-9
-    assert abs(w["put_call_ratio"] - 1 / 10) < 1e-9
+    assert abs(w["option_skew"] - 1 / 10) < 1e-9
 
 
 def test_band_boundaries():
@@ -82,7 +82,7 @@ def test_compose_coverage_and_score():
     comps = []
     for ind in cfg.indicators:
         # 半分を stale にする
-        stale = ind.id in {"put_call_ratio", "short_selling_ratio", "margin_pl_ratio", "safe_haven"}
+        stale = ind.id in {"option_skew", "short_selling_ratio", "margin_pl_ratio", "safe_haven"}
         comps.append(
             ComponentScore(
                 id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,

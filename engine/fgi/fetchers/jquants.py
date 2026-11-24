@@ -11,7 +11,7 @@ v2 認証（2026/6/1 に v1 廃止）：
 
 提供エンドポイント（Phase 2/3 で使用）：
   - 指数四本値        : /indices/bars/daily              （→ #1 モメンタムの指数価格）
-  - 日経225オプション : /derivatives/bars/daily/options/225（出来高 → #5 Put/Call）
+  - 日経225オプション : /derivatives/bars/daily/options/225（IV → #5 スキュー）
   - 業種別空売り比率  : /markets/short-ratio             （→ #7 空売り比率）
 
 レスポンスは {"data": [...], "pagination_key": "..."} 形式。pagination_key で続きを取得。
@@ -169,10 +169,10 @@ class JQuantsClient:
         return s
 
     def index_option_chain(self, date: str) -> pd.DataFrame:
-        """日経225オプション四本値（指定日・全ストライク）。#5 Put/Call の素材。
+        """日経225オプション四本値（指定日・全ストライク）。#5 スキューの素材。
 
         /derivatives/bars/daily/options/225 から取得。
-        ※ 出来高カラム名・PutCallDivision の値は実レスポンスで確認のうえ derive 側で扱う。
+        ※ IV/Strike/UnderPx/SQD/CM/PCDiv/EmMrgnTrgDiv の扱いは derive.option_skew_daily 側。
         """
         rows = self._get("/derivatives/bars/daily/options/225", {"date": date})
         if not rows:

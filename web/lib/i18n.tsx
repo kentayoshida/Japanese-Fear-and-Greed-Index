@@ -129,7 +129,7 @@ export const IND_NAME: Record<string, string> = {
   advance_decline_25: "Advance/decline ratio (Prime, 25-day)",
   new_high_low: "Net new 52-week highs and lows (TSE)",
   nikkei_vi: "Nikkei Volatility Index (VI)",
-  put_call_ratio: "Nikkei 225 options put/call ratio",
+  option_skew: "Nikkei 225 options skew (downside-hedge demand)",
   short_selling_ratio: "Short-selling ratio (TSE)",
   margin_pl_ratio: "Margin trading P/L ratio (long)",
   safe_haven: "Safe-haven demand (stock − bond 20-day return)",
@@ -144,7 +144,7 @@ export const IND_SUB: Record<string, Bi> = {
   advance_decline_25: { ja: "騰落レシオ（25日・％）", en: "25-day advance/decline ratio (%)" },
   new_high_low: { ja: "新高値 − 新安値（ネット銘柄数）", en: "Net new highs minus new lows (count)" },
   nikkei_vi: { ja: "日経VI（予想変動率）", en: "Nikkei VI (implied volatility)" },
-  put_call_ratio: { ja: "Put/Call レシオ（出来高ベース）", en: "Put/call ratio (by volume)" },
+  option_skew: { ja: "オプション・スキュー（5%OTMプットIV − コールIV・pt）", en: "Options skew (5% OTM put IV − call IV, pts)" },
   short_selling_ratio: { ja: "空売り比率（％）", en: "Short-selling ratio (%)" },
   margin_pl_ratio: { ja: "信用評価損益率（買い方・％）", en: "Margin P/L ratio, long side (%)" },
   safe_haven: { ja: "株式 − 債券 20日リターン差（％）", en: "Stock − bond 20-day return difference (%)" },
@@ -168,9 +168,9 @@ export const IND_DESC: Record<string, Bi> = {
     ja: "日経平均オプションから算出される今後1か月の予想変動率で、いわゆる恐怖指数です。相場が急落すると跳ね上がり、落ち着くと低下します。高いほど不安が大きく、本指数は上昇を恐怖の signal に使います。",
     en: "Implied volatility for the next month derived from Nikkei 225 options — the market's 'fear gauge.' It spikes when the market sells off and falls when things calm down. Higher readings mean more anxiety, so rising volatility is read as fear.",
   },
-  put_call_ratio: {
-    ja: "下落に備える保険であるプットが、上昇に賭けるコールに対してどれだけ売買されているかの比率（出来高ベース）です。日経225オプションはヘッジ目的のプット取引が常に多いため、比率は平常時でも1を大きく上回るのが普通です。そのため本指数では「1を超えたら弱気」といった絶対水準ではなく、過去1年（252営業日）の中での相対的な位置で評価し、普段より高ければ恐怖、低ければ強欲と判定します。日々の振れが大きい指標なので、単日の値より数日間の傾向で見るのがおすすめです。",
-    en: "The ratio of put volume (downside insurance) to call volume (upside bets) in Nikkei 225 options. Because hedging demand keeps put trading structurally heavy in Japan, the ratio normally sits well above 1. This index therefore does not use an absolute cutoff such as \"above 1 is bearish\"; instead it scores the ratio against its own past year (252 trading days) — higher than usual is read as fear, lower than usual as greed. The daily reading is noisy, so the multi-day trend is more informative than any single day.",
+  option_skew: {
+    ja: "下落に備えるプットの保険料（インプライド・ボラティリティ）が、上昇に賭けるコールに比べてどれだけ割高かを示します（期近の約5%下のプットと約5%上のコールのIV差、5日平均）。投資家が下落を警戒して保険を買い急ぐほど差が広がります。本指数では過去1年の中での相対水準で評価し、普段より広ければ恐怖、狭ければ強欲と判定します。",
+    en: "How expensive downside protection is relative to upside calls — the implied-volatility gap between Nikkei 225 puts ~5% below and calls ~5% above the market (front month, 5-day average). The gap widens when investors rush to buy insurance. Scored against its own past year: wider than usual reads as fear, narrower as greed.",
   },
   short_selling_ratio: {
     ja: "売買代金に占める空売り（下落に賭ける売り）の割合です。高いほど弱気・ヘッジ姿勢が強いことを示します。本指数は空売り比率の上昇を恐怖の signal に使います。",
