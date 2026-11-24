@@ -8186,10 +8186,13 @@
   ],
   "history_ref": "history.json",
   "disclaimer": "本指標は情報提供目的の自作指標であり、投資助言ではありません。",
-  "generated_at": "2026-11-23T01:18:27.189498+00:00",
+  "generated_at": "2026-11-24T05:08:55.692192+00:00",
   "mode": "real",
   "variant": "nikkei225",
   "variant_label": "日経225",
   "index_label": "日経225",
-  "index_value": 56436.65
+  "index_value": 56436.65,
+  "fetch_errors": {
+    "margin_pl_ratio_matsui": "matsui: margin_pl: 3回試行して取得失敗（最後のエラー: Page.wait_for_selector: Timeout 20000ms exceeded.\nCall log:\n  - waiting for locator(\"//*[contains(text(),'信用取引指標') or contains(text(),'信用残速報')]\") to be visible\n）"
+  }
 }
