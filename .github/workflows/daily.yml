@@ -14,6 +14,10 @@ on:
         type: choice
         options: ["real", "demo"]
         default: "real"
+      option_max_fetch:
+        description: "#5 スキューの過去分を1回で取得する最大営業日数（初回充填は 300 推奨。空=既定40）"
+        type: string
+        default: ""
 
 concurrency:
   group: daily-recompute
@@ -31,6 +35,8 @@ jobs:
       JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
       # 後方互換（v1 名・任意）
       JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
+      # #5 オプション・スキューの過去分充填数（手動実行の入力。cron 時は空＝既定40）
+      JQUANTS_OPTION_MAX_FETCH: ${{ github.event.inputs.option_max_fetch }}
     steps:
       - uses: actions/checkout@v4
 
