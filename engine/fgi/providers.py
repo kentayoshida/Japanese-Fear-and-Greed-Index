@@ -10,7 +10,7 @@
   #2 advance_decline_25: 東証 値上がり/値下がり銘柄数。←要ソース確認（株探/日経/ToS）
   #3 new_high_low      : 東証 新高値/新安値銘柄数。←要ソース確認
   #4 nikkei_vi         : JPX/大阪取引所 公式。←要ソース確認（公式CSV/Excel）
-  #5 put_call_ratio    : J-Quants 日経225オプション四本値。←J-Quants 契約後
+  #5 option_skew       : J-Quants 日経225オプション四本値の IV（5%OTMプット−コール, 5日平均）。
   #6 margin_pl_ratio   : 松井証券「投資指標（店内）」日次。←要ToS確認
   #7 short_selling     : J-Quants 業種別空売り比率。←J-Quants 契約後
   #8 safe_haven        : 指数価格 + 10年JGBトータルリターン。←債券系列ソース要確認
@@ -129,46 +129,53 @@ def _save_series_cache(path, s: pd.Series) -> None:
     out.to_csv(path, index=False)
 
 
-def _provide_put_call(config: Config, client, series: dict, errors: dict) -> None:
-    """#5 P/Cレシオ：日次のオプション四本値からP/Cを算出し、CSVに増分キャッシュ。
+def _provide_option_skew(config: Config, client, series: dict, errors: dict) -> None:
+    """#5 オプション・スキュー：日次のオプション四本値から raw(put_iv−call_iv) を算出し、
+    CSV（option_skew_raw.csv）に増分キャッシュ。指標値は raw の5営業日単純平均。
 
     オプション四本値は日付単位（1日約1万行）でしかレンジ取得できないため、
     過去ぶんは1回の実行で一定数だけ取得して積み増す（レート制限・時間を考慮）。
+    正規化（252営業日）には過去 252+5 営業日ぶんの raw が要る。初回の充填は
+    JQUANTS_OPTION_MAX_FETCH（既定40）を大きくして手動実行すると早く終わる。
+    IV の提供は 2016-07-19 以降のみ。
     """
-    from datetime import datetime, timedelta
+    from datetime import date, datetime, timedelta
 
-    from .fetchers.derive import put_call_ratio
+    from .fetchers.derive import option_skew_daily, smooth_option_skew
 
+    iv_start = date(2016, 7, 19)
     try:
-        path = _series_cache_path(config, "put_call_ratio")
+        path = _series_cache_path(config, "option_skew_raw")
         cached = _load_series_cache(path)
         jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
-        start = jst_today - timedelta(days=int(config.lookback_days * 1.6) + 10)
+        start = max(iv_start, jst_today - timedelta(days=int(config.lookback_days * 1.6) + 20))
         target = pd.bdate_range(start=start, end=jst_today)
         have = {d.normalize() for d in cached.index}
         missing = [d for d in target if d.normalize() not in have]
-        max_new = int(os.environ.get("JQUANTS_PC_MAX_FETCH", "40"))
+        max_new = int(os.environ.get("JQUANTS_OPTION_MAX_FETCH")
+                      or os.environ.get("JQUANTS_PC_MAX_FETCH") or "40")
         new: dict[pd.Timestamp, float] = {}
         for d in missing[-max_new:]:  # 直近の未取得日から積み増す
             try:
                 chain = client.index_option_chain(d.strftime("%Y-%m-%d"))
             except Exception:  # noqa: BLE001  休場日などはスキップ
                 continue
-            r = put_call_ratio(chain)
-            if len(r):
-                new[pd.Timestamp(d.date())] = float(r.iloc[-1])
+            r = option_skew_daily(chain)
+            if r is not None:
+                new[pd.Timestamp(d.date())] = float(r[2])
         merged = cached
         if new:
             merged = pd.concat([cached, pd.Series(new)]).sort_index()
             merged = merged[~merged.index.duplicated(keep="last")]
             _save_series_cache(path, merged)
-        if len(merged) == 0:
-            raise FetchError("put_call_ratio: データ未取得（キャッシュ空・初回は数回の実行で積み増し）")
-        series["put_call_ratio"] = IndicatorSeries("put_call_ratio", merged, "jquants_v2")
+        smoothed = smooth_option_skew(merged, window=5)
+        if len(smoothed) == 0:
+            raise FetchError("option_skew: データ未取得（キャッシュ不足・初回は数回の実行で積み増し）")
+        series["option_skew"] = IndicatorSeries("option_skew", smoothed, "jquants_v2")
     except FetchError as exc:
-        errors["put_call_ratio"] = str(exc)
+        errors["option_skew"] = str(exc)
     except Exception as exc:  # noqa: BLE001
-        errors["put_call_ratio"] = f"put_call_ratio: {exc}"
+        errors["option_skew"] = f"option_skew: {exc}"
 
 
 def _provide_short_ratio(config: Config, client, series: dict, errors: dict) -> None:
@@ -605,13 +612,13 @@ def _provide_real(config: Config, variant: Variant,
     client = None
     if JQuantsClient.is_configured():
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
-        _provide_put_call(config, client, series, errors)
+        _provide_option_skew(config, client, series, errors)
         _provide_short_ratio(config, client, series, errors)
         _provide_safe_haven(config, client, variant, series, errors)
         _provide_advance_decline(config, client, series, errors)
         _provide_new_high_low(config, client, series, errors)
     else:
-        for k in ("put_call_ratio", "short_selling_ratio", "safe_haven",
+        for k in ("option_skew", "short_selling_ratio", "safe_haven",
                   "advance_decline_25", "new_high_low"):
             errors[k] = "要確認: J-Quants APIキー（JQUANTS_API_KEY）未設定"
 
@@ -670,7 +677,7 @@ def _provide_demo(config: Config, n_days: int = 420, seed: int = 20260628) -> di
         "advance_decline_25":  (100, 4.0, (60, 145), 8.0),
         "new_high_low":        (0.0, 30.0, (-400, 400), 80.0),
         "nikkei_vi":           (22, 1.0, (12, 45), -3.0),    # 不安時に上昇（moodと逆）
-        "put_call_ratio":      (1.05, 0.05, (0.6, 1.8), -0.12),
+        "option_skew":         (6.0, 0.4, (0.0, 15.0), -1.0),
         "margin_pl_ratio":     (-10, 1.2, (-28, 6), 4.0),
         "short_selling_ratio": (43, 0.8, (35, 52), -2.0),
         "safe_haven":          (1.0, 1.5, (-12, 12), 3.0),

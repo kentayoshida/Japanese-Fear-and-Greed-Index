@@ -138,3 +138,72 @@ def test_pipeline_latest_and_history():
     for row in hist:
         assert 0 <= row["score"] <= 100
         assert row["coverage"] == len(cfg.indicators)
+
+
+# ---- #5 オプション・スキュー ------------------------------------------------
+def _chain(date="2026-11-20", under=50000.0, sqd_near="2026-11-27", sqd_next="2026-12-11",
+           extra_rows=()):
+    """期近(11月限, SQ=sqd_near)・次限月(12月限)の合成チェーン。"""
+    rows = []
+    for cm, sqd, put_base, call_base in (("2026-11", sqd_near, 30.0, 22.0),
+                                         ("2026-12", sqd_next, 28.0, 24.0)):
+        for k in range(45000, 55500, 500):
+            rows.append(dict(Date=date, EmMrgnTrgDiv="002", UnderPx=under, SQD=sqd, CM=cm,
+                             PCDiv="1", Strike=float(k), IV=put_base + (50000 - k) / 1000.0))
+            rows.append(dict(Date=date, EmMrgnTrgDiv="002", UnderPx=under, SQD=sqd, CM=cm,
+                             PCDiv="2", Strike=float(k), IV=call_base + (k - 50000) / 5000.0))
+    rows.extend(extra_rows)
+    return pd.DataFrame(rows)
+
+
+def test_option_skew_daily_picks_front_month_5pct_otm():
+    from fgi.fetchers.derive import option_skew_daily
+
+    put_iv, call_iv, raw = option_skew_daily(_chain())
+    # 期近(11月限): put 47500 → 30+2.5=32.5 / call 52500 → 22+0.5=22.5
+    assert abs(put_iv - 32.5) < 1e-9
+    assert abs(call_iv - 22.5) < 1e-9
+    assert abs(raw - 10.0) < 1e-9
+
+
+def test_option_skew_daily_rolls_to_next_month_when_sq_within_7_days():
+    from fgi.fetchers.derive import option_skew_daily
+
+    # 当日2026-11-20 に対し SQ=11-26（6暦日）→ 次の限月(12月限)に乗り換え
+    put_iv, call_iv, raw = option_skew_daily(_chain(sqd_near="2026-11-26"))
+    assert abs(put_iv - (28.0 + 2.5)) < 1e-9
+    assert abs(call_iv - (24.0 + 0.5)) < 1e-9
+    # ちょうど7暦日（11-27）は期近のまま
+    assert abs(option_skew_daily(_chain(sqd_near="2026-11-27"))[2] - 10.0) < 1e-9
+
+
+def test_option_skew_daily_excludes_emergency_margin_rows_and_zero_iv():
+    from fgi.fetchers.derive import option_skew_daily
+
+    # 緊急取引証拠金区分 "001" の行（極端な IV）は無視される
+    bogus = [dict(Date="2026-11-20", EmMrgnTrgDiv="001", UnderPx=50000.0, SQD="2026-11-27",
+                  CM="2026-11", PCDiv="1", Strike=47500.0, IV=99.0)]
+    assert abs(option_skew_daily(_chain(extra_rows=bogus))[2] - 10.0) < 1e-9
+    # IV=0 の最近傍行は飛ばして IV>0 の次点を採る
+    df = _chain()
+    df.loc[(df.CM == "2026-11") & (df.PCDiv == "2") & (df.Strike == 52500.0), "IV"] = 0.0
+    _, call_iv, _ = option_skew_daily(df)
+    assert call_iv > 0 and abs(call_iv - 22.5) > 1e-6  # 52500 ではなく 52000/53000 側
+
+
+def test_option_skew_daily_returns_none_when_unavailable():
+    from fgi.fetchers.derive import option_skew_daily
+
+    df = _chain()
+    assert option_skew_daily(df[df.PCDiv == "1"]) is None  # コール無し
+    assert option_skew_daily(_chain(sqd_near="2026-11-20", sqd_next="2026-11-25")) is None  # 限月なし
+
+
+def test_smooth_option_skew_5day_mean():
+    from fgi.fetchers.derive import smooth_option_skew
+
+    s = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0, 11.0], index=_dates(6))
+    sm = smooth_option_skew(s, window=5)
+    assert len(sm) == 2  # 5本そろった日のみ
+    assert abs(sm.iloc[0] - 3.0) < 1e-9
+    assert abs(sm.iloc[1] - 5.0) < 1e-9

@@ -38,6 +38,12 @@ function makeRawTooltip() {
   };
 }
 
+// 生値の表示形式。スキューは「+8.5pt」のようにポイント表記（符号付き・小数1桁）。
+function fmtRaw(id: string, raw: number): string {
+  if (id === "option_skew") return `${raw >= 0 ? "+" : "−"}${Math.abs(raw).toFixed(1)}pt`;
+  return raw.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 function RawChart({ series, accumLabel }: { series: { d: string; v: number | null }[]; accumLabel: string }) {
   const valid = series.filter((p) => typeof p.v === "number");
   if (valid.length < 2) {
@@ -101,7 +107,7 @@ export default function IndicatorCard({
         </span>
         <p className="ind-card__desc">{pick(IND_DESC[c.id], lang, c.description || "")}</p>
         <p className="ind-card__figures">
-          {t(lang, "cardValue")} {c.raw !== null ? c.raw.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+          {t(lang, "cardValue")} {c.raw !== null ? fmtRaw(c.id, c.raw) : "—"}
           <span className="dot">•</span>
           {t(lang, "cardWeight")} {(c.weight * 100).toFixed(1)}%
         </p>
