@@ -8,7 +8,7 @@ import {
   CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { Component, colorForScore, labelForScore } from "@/lib/fgi";
-import { useLang, t, DIM, IND_NAME, IND_SUB, IND_DESC, pick } from "@/lib/i18n";
+import { useLang, t, DIM, IND_NAME, IND_SUB, IND_DESC, pick, type Lang } from "@/lib/i18n";
 
 function formatFetched(iso: string | undefined, lang: string): string | null {
   if (!iso) return null;
@@ -39,8 +39,16 @@ function makeRawTooltip() {
 }
 
 // 生値の表示形式。スキューは「+8.5pt」のようにポイント表記（符号付き・小数1桁）。
-function fmtRaw(id: string, raw: number): string {
-  if (id === "option_skew") return `${raw >= 0 ? "+" : "−"}${Math.abs(raw).toFixed(1)}pt`;
+// 空売り比率は「5日平均 40.7%（当日 36.2%）」のように平均と当日値の両方を出す。
+function fmtRaw(c: Component, lang: Lang): string {
+  const raw = c.raw as number;
+  if (c.id === "option_skew") return `${raw >= 0 ? "+" : "−"}${Math.abs(raw).toFixed(1)}pt`;
+  if (c.id === "short_selling_ratio") {
+    const avg = `${raw.toFixed(1)}%`;
+    const day = c.raw_daily != null ? `${c.raw_daily.toFixed(1)}%` : null;
+    if (lang === "en") return day ? `5-day avg ${avg} (today ${day})` : `5-day avg ${avg}`;
+    return day ? `5日平均 ${avg}（当日 ${day}）` : `5日平均 ${avg}`;
+  }
   return raw.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
@@ -107,7 +115,7 @@ export default function IndicatorCard({
         </span>
         <p className="ind-card__desc">{pick(IND_DESC[c.id], lang, c.description || "")}</p>
         <p className="ind-card__figures">
-          {t(lang, "cardValue")} {c.raw !== null ? fmtRaw(c.id, c.raw) : "—"}
+          {t(lang, "cardValue")} {c.raw !== null ? fmtRaw(c, lang) : "—"}
           <span className="dot">•</span>
           {t(lang, "cardWeight")} {(c.weight * 100).toFixed(1)}%
         </p>

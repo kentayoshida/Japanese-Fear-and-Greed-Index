@@ -60,7 +60,7 @@ const INDICATORS: Doc[] = [
     dim: { ja: "ヘッジ / ポジショニング", en: "Hedging & Positioning" },
     measures: { ja: "売買のうち「空売り（下落に賭ける売り）」が占める割合。弱気姿勢の強さ。", en: "The share of trading that is short selling (bets on falling prices) — how bearish positioning is." },
     source: { ja: "J-Quants の業種別空売り比率を市場全体に合算。", en: "Sector short-selling ratios via J-Quants, aggregated market-wide." },
-    calc: { ja: "(規制あり空売り + 規制なし空売り) ÷ (実売り + 空売り合計) × 100。", en: "(restricted + unrestricted short selling) ÷ (real selling + total short selling) × 100." },
+    calc: { ja: "(規制あり空売り + 規制なし空売り) ÷ (実売り + 空売り合計) × 100 を、5営業日で単純平均。暴落日は投げ売りで分母が膨らみ単日値がかえって下がるため、平均で平滑化します。", en: "(restricted + unrestricted short selling) ÷ (real selling + total short selling) × 100, averaged over 5 trading days. On crash days forced selling inflates the denominator and the single-day ratio can drop, so the average smooths this out." },
     high: { ja: "高い＝弱気/ヘッジが強い＝Fear。反転して合成。", en: "High = stronger bearish/hedging stance = fear. Inverted in the composite." },
   },
   {

@@ -25,6 +25,7 @@ class ComponentScore:
     stale: bool = False
     description_ja: str = ""
     data_date: str | None = None  # この指標が使っている生値の基準日（公表日）
+    raw_daily: float | None = None  # 平滑化指標の当日単日値（表示用。採点は raw）
 
 
 def band_for_score(config: Config, score: float) -> tuple[str, str]:
@@ -63,6 +64,7 @@ def compose(config: Config, components: list[ComponentScore], as_of: str) -> dic
                 "stale": c.stale or c.score is None,
                 "description": c.description_ja,
                 "data_date": c.data_date,
+                "raw_daily": None if c.raw_daily is None else round(float(c.raw_daily), 6),
             }
         )
 
