@@ -86,11 +86,11 @@ indicators:
     description_ja: "信用買い建玉の含み損益率。低い（含み損が深い）ほど個人の恐怖が強い。"
 
   - id: short_selling_ratio
-    label_ja: "空売り比率（東証）"
+    label_ja: "空売り比率（東証・5日平均）"
     dimension: hedge_positioning   # #5 スキューと同一次元に束ねて6次元を維持（dimensions注記参照）
     method: percentile
     inverted: true   # 高い空売り比率 = 恐怖（反転）
-    description_ja: "売買代金に占める空売りの比率。高いほどヘッジ/弱気姿勢が強い（反転）。"
+    description_ja: "売買代金に占める空売りの比率の5日平均。高いほどヘッジ/弱気姿勢が強い（反転）。暴落日の単日値の逆転を平滑化。"
 
   - id: safe_haven
     label_ja: "セーフヘイブン需要（株式 − 債券 20日リターン差）"

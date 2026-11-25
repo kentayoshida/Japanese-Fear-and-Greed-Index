@@ -130,7 +130,7 @@ export const IND_NAME: Record<string, string> = {
   new_high_low: "Net new 52-week highs and lows (TSE)",
   nikkei_vi: "Nikkei Volatility Index (VI)",
   option_skew: "Nikkei 225 options skew (downside-hedge demand)",
-  short_selling_ratio: "Short-selling ratio (TSE)",
+  short_selling_ratio: "Short-selling ratio (TSE, 5-day avg)",
   margin_pl_ratio: "Margin trading P/L ratio (long)",
   safe_haven: "Safe-haven demand (stock − bond 20-day return)",
 };
@@ -145,7 +145,7 @@ export const IND_SUB: Record<string, Bi> = {
   new_high_low: { ja: "新高値 − 新安値（ネット銘柄数）", en: "Net new highs minus new lows (count)" },
   nikkei_vi: { ja: "日経VI（予想変動率）", en: "Nikkei VI (implied volatility)" },
   option_skew: { ja: "オプション・スキュー（5%OTMプットIV − コールIV・pt）", en: "Options skew (5% OTM put IV − call IV, pts)" },
-  short_selling_ratio: { ja: "空売り比率（％）", en: "Short-selling ratio (%)" },
+  short_selling_ratio: { ja: "空売り比率（5日平均・％）", en: "Short-selling ratio (5-day avg, %)" },
   margin_pl_ratio: { ja: "信用評価損益率（買い方・％）", en: "Margin P/L ratio, long side (%)" },
   safe_haven: { ja: "株式 − 債券 20日リターン差（％）", en: "Stock − bond 20-day return difference (%)" },
 };
@@ -173,8 +173,8 @@ export const IND_DESC: Record<string, Bi> = {
     en: "How expensive downside protection is relative to upside calls — the implied-volatility gap between Nikkei 225 puts ~5% below and calls ~5% above the market (front month, 5-day average). The gap widens when investors rush to buy insurance. Scored against its own past year: wider than usual reads as fear, narrower as greed.",
   },
   short_selling_ratio: {
-    ja: "売買代金に占める空売り（下落に賭ける売り）の割合です。高いほど弱気・ヘッジ姿勢が強いことを示します。本指数は空売り比率の上昇を恐怖の signal に使います。",
-    en: "The share of trading value coming from short selling (bets on falling prices). A higher ratio indicates stronger bearish or hedging positioning, so a rising short-selling ratio is read as fear.",
+    ja: "売買代金に占める空売りの比率（5日平均）。弱気筋の売り圧力やヘッジ需要が強いほど高くなります。なお、暴落日は信用取引の投げ売りなど通常の売りが急増するため、単日の比率はかえって下がることがあります。そのため本指数では5日平均を過去1年の中での相対水準で評価し、高ければ恐怖、低ければ強欲と判定します。",
+    en: "The share of trading value coming from short selling (5-day average). It rises with bearish selling pressure and hedging demand. On crash days, however, ordinary selling such as forced margin liquidation surges, so the single-day ratio can actually fall. This index therefore scores the 5-day average against its own past year: higher than usual reads as fear, lower as greed.",
   },
   margin_pl_ratio: {
     ja: "信用取引で株を買っている個人が平均でどれだけ含み益/含み損かを示します。0%近辺なら楽観、−20%以下は歴史的に強い悲観（逆張り買いの目安）とされます。低いほど個人の恐怖が強い状態です。",

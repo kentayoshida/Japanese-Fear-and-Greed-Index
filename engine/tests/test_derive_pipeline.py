@@ -207,3 +207,39 @@ def test_smooth_option_skew_5day_mean():
     assert len(sm) == 2  # 5本そろった日のみ
     assert abs(sm.iloc[0] - 3.0) < 1e-9
     assert abs(sm.iloc[1] - 5.0) < 1e-9
+
+
+# ---- #7 空売り比率の5日平均 -------------------------------------------------
+def test_rolling_mean_matches_spec_values():
+    """実装指示 #7 の回帰値：11-24 の5日平均 40.69、11-20 は 41.87（本番の単日値から）。"""
+    from fgi.fetchers.derive import rolling_mean
+
+    daily = pd.Series(
+        [43.3218, 42.1443, 41.6149, 43.6934, 43.4256, 38.4885, 36.2262],
+        index=pd.to_datetime(["2026-11-13", "2026-11-16", "2026-11-17", "2026-11-18",
+                              "2026-11-19", "2026-11-20", "2026-11-24"]),
+    )
+    sm = rolling_mean(daily, window=5)
+    assert round(sm.loc["2026-11-24"], 2) == 40.69
+    assert round(sm.loc["2026-11-20"], 2) == 41.87
+    assert len(sm) == 3  # 5本そろう 11-19 以降のみ
+
+
+def test_pipeline_emits_raw_daily_for_smoothed_indicator():
+    """daily を持つ指標は raw=5日平均、raw_daily=当日単日値として出力される。"""
+    from fgi.config import load_config
+    from fgi.fetchers.base import IndicatorSeries
+    from fgi.fetchers.derive import rolling_mean
+    from fgi.pipeline import build_latest
+
+    cfg = load_config()
+    d = _dates(30)
+    daily = pd.Series([40.0 + (i % 7) for i in range(30)], index=d)
+    ser = IndicatorSeries("short_selling_ratio", rolling_mean(daily, 5), "test", daily=daily)
+    out = build_latest(cfg, {"short_selling_ratio": ser}, d[-1])
+    c = next(c for c in out["components"] if c["id"] == "short_selling_ratio")
+    assert abs(c["raw"] - daily.iloc[-5:].mean()) < 1e-6
+    assert abs(c["raw_daily"] - daily.iloc[-1]) < 1e-6
+    # daily を持たない指標は raw_daily=None
+    other = next(c for c in out["components"] if c["id"] == "nikkei_vi")
+    assert other["raw_daily"] is None

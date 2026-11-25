@@ -129,10 +129,15 @@ def option_skew_daily(
     return put_iv, call_iv, put_iv - call_iv
 
 
-def smooth_option_skew(raw: pd.Series, window: int = 5) -> pd.Series:
-    """日次スキュー raw の window 営業日単純平均（window 本そろった日のみ）。"""
-    r = pd.to_numeric(raw, errors="coerce").sort_index()
+def rolling_mean(raw: pd.Series, window: int = 5) -> pd.Series:
+    """日次系列の window 営業日単純平均（window 本そろった日のみ）。#5 スキュー・#7 空売りで共用。"""
+    r = pd.to_numeric(raw, errors="coerce").dropna().sort_index()
     return r.rolling(window=window, min_periods=window).mean().dropna()
+
+
+def smooth_option_skew(raw: pd.Series, window: int = 5) -> pd.Series:
+    """日次スキュー raw の window 営業日単純平均（後方互換の別名）。"""
+    return rolling_mean(raw, window)
 
 
 def short_selling_market_ratio(

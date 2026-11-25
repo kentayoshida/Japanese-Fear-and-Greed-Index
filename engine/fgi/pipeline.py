@@ -36,6 +36,7 @@ def _component_for_date(
     history = list(window.values)
     raw = float(window.iloc[-1])
     data_date = pd.Timestamp(window.index[-1]).strftime("%Y-%m-%d")  # この指標の基準日
+    raw_daily = ser.daily_as_of(date)  # 平滑化指標の当日単日値（無ければ None）
     try:
         score = normalize_indicator(
             method=ind.method,
@@ -49,12 +50,14 @@ def _component_for_date(
             id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,
             raw=raw, score=None, inverted=ind.inverted, stale=True,
             description_ja=ind.description_ja, data_date=data_date,
+            raw_daily=raw_daily,
         )
 
     return ComponentScore(
         id=ind.id, label_ja=ind.label_ja, dimension=ind.dimension,
         raw=raw, score=score, inverted=ind.inverted, stale=False,
         description_ja=ind.description_ja, data_date=data_date,
+        raw_daily=raw_daily,
     )
 
 

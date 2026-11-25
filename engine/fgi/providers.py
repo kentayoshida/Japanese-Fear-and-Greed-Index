@@ -12,7 +12,7 @@
   #4 nikkei_vi         : JPX/大阪取引所 公式。←要ソース確認（公式CSV/Excel）
   #5 option_skew       : J-Quants 日経225オプション四本値の IV（5%OTMプット−コール, 5日平均）。
   #6 margin_pl_ratio   : 松井証券「投資指標（店内）」日次。←要ToS確認
-  #7 short_selling     : J-Quants 業種別空売り比率。←J-Quants 契約後
+  #7 short_selling     : J-Quants 業種別空売り比率（市場全体に合算・5日平均）。
   #8 safe_haven        : 指数価格 + 10年JGBトータルリターン。←債券系列ソース要確認
 
 未結線の指標は FetchError("要確認: ...") を送出する。実装者が各ソースを
@@ -179,10 +179,10 @@ def _provide_option_skew(config: Config, client, series: dict, errors: dict) -> 
 
 
 def _provide_short_ratio(config: Config, client, series: dict, errors: dict) -> None:
-    """#7 空売り比率：業種別レンジを集計して市場全体比率の系列を作る。"""
+    """#7 空売り比率：業種別レンジを集計して市場全体比率を作り、5営業日平均を指標値にする。"""
     from datetime import datetime, timedelta
 
-    from .fetchers.derive import short_selling_market_ratio
+    from .fetchers.derive import rolling_mean, short_selling_market_ratio
 
     try:
         start = (datetime.utcnow() + timedelta(hours=9)
@@ -191,7 +191,10 @@ def _provide_short_ratio(config: Config, client, series: dict, errors: dict) -> 
         ratio = short_selling_market_ratio(df)
         ratio = validate_series(ratio, indicator_id="short_selling_ratio",
                                 min_value=0, max_value=100, min_points=20)
-        series["short_selling_ratio"] = IndicatorSeries("short_selling_ratio", ratio, "jquants_v2")
+        # 単日値は暴落日に投げ売りで分母が膨らみ逆転するため、5営業日平均で採点する。
+        smoothed = rolling_mean(ratio, window=5)
+        series["short_selling_ratio"] = IndicatorSeries(
+            "short_selling_ratio", smoothed, "jquants_v2", daily=ratio)
     except FetchError as exc:
         errors["short_selling_ratio"] = str(exc)
     except Exception as exc:  # noqa: BLE001

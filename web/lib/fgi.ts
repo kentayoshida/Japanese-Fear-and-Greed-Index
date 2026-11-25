@@ -12,6 +12,7 @@ export type Component = {
   stale: boolean;
   description?: string;
   data_date?: string; // この指標が使っている生値の基準日（公表日）
+  raw_daily?: number | null; // 平滑化指標（#7 空売り比率など）の当日単日値（表示用）
   series?: { d: string; v: number | null }[]; // 生値の時系列（CNN型カードチャート用）
 };
 
