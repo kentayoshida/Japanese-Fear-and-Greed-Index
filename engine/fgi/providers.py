@@ -7,8 +7,8 @@
 
 実ソースの結線状況（2026-06 時点）：
   #1 momentum_125dma   : 指数価格（J-Quants 指数四本値 / stooq）から計算。←Phase1で結線可
-  #2 advance_decline_25: 東証 値上がり/値下がり銘柄数。←要ソース確認（株探/日経/ToS）
-  #3 new_high_low      : 東証 新高値/新安値銘柄数。←要ソース確認
+  #2 advance_decline_25: J-Quants 全銘柄終値（共通キャッシュ）からプライムの値上がり/値下がりを集計。
+  #3 new_high_low      : 同じ全銘柄終値の52週(245営業日)高安から算出。
   #4 nikkei_vi         : JPX/大阪取引所 公式。←要ソース確認（公式CSV/Excel）
   #5 option_skew       : J-Quants 日経225オプション四本値の IV（5%OTMプット−コール, 5日平均）。
   #6 margin_pl_ratio   : 松井証券「投資指標（店内）」日次。←要ToS確認
@@ -31,6 +31,47 @@ from .fetchers.base import FetchError, IndicatorSeries, validate_series
 from .fetchers.derive import momentum_125dma
 
 
+def _jst_today():
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).date()
+
+
+def _fetch_start(config: Config, days_back: int, warmup_days: int = 0):
+    """取得開始日（date）。従来の「今日から days_back 日前」と、config.data_start から
+    warmup_days 日前の、早い方。data_start 未設定なら従来どおり。"""
+    from datetime import date, timedelta
+
+    base = _jst_today() - timedelta(days=int(days_back))
+    if config.data_start:
+        ds = date.fromisoformat(config.data_start) - timedelta(days=int(warmup_days))
+        return min(base, ds)
+    return base
+
+
+_TRADING_DAYS_MEMO: dict[str, pd.DatetimeIndex] = {}
+
+
+def _trading_days(client, start) -> pd.DatetimeIndex:
+    """start 以降の東証営業日（TOPIX 終値のある日）。取得失敗時は平日で代用。
+
+    休場日を「未取得」と誤認して毎回再取得し続けるのを防ぐ（増分キャッシュの枠を浪費しない）。
+    1回の実行内ではメモ化して API 呼び出しを1回に抑える。
+    """
+    key = pd.Timestamp(start).strftime("%Y-%m-%d")
+    if key in _TRADING_DAYS_MEMO:
+        return _TRADING_DAYS_MEMO[key]
+    try:
+        s = client.index_close(code="0000", from_date=key)
+        days = pd.DatetimeIndex(pd.to_datetime(s.index).normalize().unique()).sort_values()
+        if len(days) == 0:
+            raise ValueError("empty calendar")
+    except Exception:  # noqa: BLE001
+        days = pd.bdate_range(start=key, end=_jst_today())
+    _TRADING_DAYS_MEMO[key] = days
+    return days
+
+
 def _equity_close(config: Config, equity: dict) -> pd.Series:
     """版の株式指数終値系列を取得する（#1 モメンタム・#8 株式レッグ用）。
 
@@ -47,17 +88,43 @@ def _equity_close(config: Config, equity: dict) -> pd.Series:
         if not JQuantsClient.is_configured():
             raise FetchError("equity_close(jquants): APIキー未設定")
         client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
-        from_date = (datetime.utcnow() - timedelta(days=900)).strftime("%Y-%m-%d")
+        # 125日線＋252日パーセンタイルの助走ぶん、data_start より約200日前から取得
+        from_date = _fetch_start(config, 900, warmup_days=200).strftime("%Y-%m-%d")
         return client.index_close(code=equity.get("code", "0000"), from_date=from_date)
     if src == "nikkei_csv":
         url = equity.get("csv_url")
         if not url:
             raise FetchError("equity_close(nikkei_csv): csv_url 未設定")
         # 日経公式の日次CSV（VIと同じ構造・パーサ。終値列を検出）。
-        return _nikkei_official_ohlc_csv(url, equity.get("encoding", "cp932"))
+        s = _nikkei_official_ohlc_csv(url, equity.get("encoding", "cp932"))
+        return _extend_with_proxy(config, equity, s)
     if src == "stooq":
         return _stooq_close(equity.get("symbol", "^nkx"))
     raise FetchError(f"equity_close: 未対応 source={src}")
+
+
+def _extend_with_proxy(config: Config, equity: dict, s: pd.Series) -> pd.Series:
+    """公式CSVの初日が取得開始日より新しければ、連動ETF（backfill_proxy_code）の調整後終値で
+    過去を補う（stitch_with_proxy）。ETFの取得に失敗しても公式CSVだけで続行する。"""
+    from .fetchers.derive import stitch_with_proxy
+    from .fetchers.jquants import JQuantsClient
+
+    code = equity.get("backfill_proxy_code")
+    if not code or not config.data_start or not len(s) or not JQuantsClient.is_configured():
+        return s
+    need = pd.Timestamp(_fetch_start(config, 900, warmup_days=200))
+    if s.index.min() <= need:
+        return s
+    try:
+        client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
+        proxy = client.equity_adj_close(str(code), from_date=need.strftime("%Y-%m-%d"))
+        out = stitch_with_proxy(s, proxy)
+        print(f"[equity] 公式CSV初日 {s.index.min().date()} より前を ETF {code} で補完 "
+              f"→ 初日 {out.index.min().date()}")
+        return out
+    except Exception as exc:  # noqa: BLE001
+        print(f"[equity] ETF {code} による補完に失敗（公式CSVのみで続行）: {exc}")
+        return s
 
 
 # =============================================================================
@@ -76,8 +143,8 @@ def _nikkei_close_real(config: Config) -> pd.Series:
     if JQuantsClient.is_configured():
         try:
             client = JQuantsClient(base_url=config.sources.get("jquants", {}).get("base_url"))
-            # 125日移動平均＋252日パーセンタイルに十分な履歴（約2.5年）を取得
-            from_date = (datetime.utcnow() - timedelta(days=900)).strftime("%Y-%m-%d")
+            # 125日移動平均＋252日パーセンタイルに十分な履歴（data_start の約200日前から）
+            from_date = _fetch_start(config, 900, warmup_days=200).strftime("%Y-%m-%d")
             return client.index_close(code="0000", from_date=from_date)  # 日経平均
         except Exception as exc:  # noqa: BLE001
             raise FetchError(f"nikkei_close(J-Quants): {exc}") from exc
@@ -139,7 +206,7 @@ def _provide_option_skew(config: Config, client, series: dict, errors: dict) -> 
     JQUANTS_OPTION_MAX_FETCH（既定40）を大きくして手動実行すると早く終わる。
     IV の提供は 2016-07-19 以降のみ。
     """
-    from datetime import date, datetime, timedelta
+    from datetime import date
 
     from .fetchers.derive import option_skew_daily, smooth_option_skew
 
@@ -147,9 +214,8 @@ def _provide_option_skew(config: Config, client, series: dict, errors: dict) -> 
     try:
         path = _series_cache_path(config, "option_skew_raw")
         cached = _load_series_cache(path)
-        jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
-        start = max(iv_start, jst_today - timedelta(days=int(config.lookback_days * 1.6) + 20))
-        target = pd.bdate_range(start=start, end=jst_today)
+        start = max(iv_start, _fetch_start(config, int(config.lookback_days * 1.6) + 20))
+        target = _trading_days(client, start)
         have = {d.normalize() for d in cached.index}
         missing = [d for d in target if d.normalize() not in have]
         max_new = int(os.environ.get("JQUANTS_OPTION_MAX_FETCH")
@@ -168,6 +234,8 @@ def _provide_option_skew(config: Config, client, series: dict, errors: dict) -> 
             merged = pd.concat([cached, pd.Series(new)]).sort_index()
             merged = merged[~merged.index.duplicated(keep="last")]
             _save_series_cache(path, merged)
+        print(f"[option_skew] 今回取得 {len(new)} 日 / 残り未取得 "
+              f"{max(len(missing) - min(len(missing), max_new), 0)} 日（{start} 以降）")
         smoothed = smooth_option_skew(merged, window=5)
         if len(smoothed) == 0:
             raise FetchError("option_skew: データ未取得（キャッシュ不足・初回は数回の実行で積み増し）")
@@ -185,8 +253,8 @@ def _provide_short_ratio(config: Config, client, series: dict, errors: dict) -> 
     from .fetchers.derive import rolling_mean, short_selling_market_ratio
 
     try:
-        start = (datetime.utcnow() + timedelta(hours=9)
-                 - timedelta(days=int(config.lookback_days * 1.6) + 10)).strftime("%Y-%m-%d")
+        start = _fetch_start(config, int(config.lookback_days * 1.6) + 10,
+                             warmup_days=10).strftime("%Y-%m-%d")
         df = client.short_ratio_market_df(start)
         ratio = short_selling_market_ratio(df)
         ratio = validate_series(ratio, indicator_id="short_selling_ratio",
@@ -292,8 +360,8 @@ def _provide_safe_haven(config: Config, client, variant: Variant, series: dict, 
     try:
         jq = config.sources.get("jquants", {})
         bond_code = jq.get("bond_etf_code", "2510")
-        from_date = (datetime.utcnow() + timedelta(hours=9)
-                     - timedelta(days=int(config.lookback_days * 1.6) + 40)).strftime("%Y-%m-%d")
+        from_date = _fetch_start(config, int(config.lookback_days * 1.6) + 40,
+                                 warmup_days=40).strftime("%Y-%m-%d")
         eq = _equity_close(config, variant.equity)                     # 版の株式指数
         bond = client.equity_adj_close(bond_code, from_date=from_date)  # 国債ETF 調整後終値
         sh = safe_haven(eq, bond, window=20)
@@ -304,70 +372,6 @@ def _provide_safe_haven(config: Config, client, variant: Variant, series: dict, 
         errors["safe_haven"] = str(exc)
     except Exception as exc:  # noqa: BLE001
         errors["safe_haven"] = f"safe_haven: {exc}"
-
-
-def _provide_advance_decline(config: Config, client, series: dict, errors: dict) -> None:
-    """#2 騰落レシオ（東証プライム・25日）：全銘柄 AdjC の前日比で日次の値上がり/値下がり
-    銘柄数を集計し、25日累積で騰落レシオを算出。日次 adv/dec を CSV に増分キャッシュ。"""
-    from datetime import datetime, timedelta
-
-    from .fetchers.derive import advance_decline_ratio
-
-    try:
-        path = _series_cache_path(config, "advance_decline")
-        # 既存キャッシュ（date, adv, dec）
-        if path.exists():
-            cdf = pd.read_csv(path)
-            cdf["date"] = pd.to_datetime(cdf["date"])
-            cache = cdf.set_index("date")[["adv", "dec"]].sort_index()
-        else:
-            cache = pd.DataFrame(columns=["adv", "dec"], dtype="float64")
-
-        jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
-        start = jst_today - timedelta(days=int(config.lookback_days * 1.6) + 40)
-        target = pd.bdate_range(start=start, end=jst_today)
-        have = {d.normalize() for d in cache.index}
-        missing = [d for d in target if d.normalize() not in have]
-        max_new = int(os.environ.get("JQUANTS_AD_MAX_FETCH", "25"))
-        # 前日比のため、対象バッチ＋その1営業日前から連続取得する
-        batch = missing[-max_new:]
-        if batch:
-            prime = client.listed_codes_by_market("プライム")
-            fetch_dates = list(pd.bdate_range(end=batch[-1], periods=len(batch) + 1))
-            fetch_dates = [d for d in fetch_dates if d >= (batch[0] - pd.Timedelta(days=7))]
-            prev_close = None
-            new_rows = {}
-            for d in fetch_dates:
-                closes = client.equities_close_by_date(d.strftime("%Y-%m-%d"))
-                if len(closes) == 0:
-                    continue  # 休場日
-                closes = closes[closes.index.isin(prime)]
-                if prev_close is not None and d.normalize() in {b.normalize() for b in batch}:
-                    common = closes.index.intersection(prev_close.index)
-                    diff = closes[common] - prev_close[common]
-                    new_rows[pd.Timestamp(d.date())] = {
-                        "adv": float((diff > 0).sum()),
-                        "dec": float((diff < 0).sum()),
-                    }
-                prev_close = closes
-            if new_rows:
-                add = pd.DataFrame.from_dict(new_rows, orient="index")
-                cache = pd.concat([cache, add]).sort_index()
-                cache = cache[~cache.index.duplicated(keep="last")]
-                out = cache.copy()
-                out.insert(0, "date", pd.DatetimeIndex(out.index).strftime("%Y-%m-%d"))
-                out.to_csv(path, index=False)
-
-        if len(cache) == 0:
-            raise FetchError("advance_decline: データ未取得（初回は数回の実行で積み増し）")
-        ratio = advance_decline_ratio(cache["adv"], cache["dec"], window=25)
-        if len(ratio) == 0:
-            raise FetchError("advance_decline: 25日ぶんの蓄積待ち")
-        series["advance_decline_25"] = IndicatorSeries("advance_decline_25", ratio, "jquants_v2")
-    except FetchError as exc:
-        errors["advance_decline_25"] = str(exc)
-    except Exception as exc:  # noqa: BLE001
-        errors["advance_decline_25"] = f"advance_decline_25: {exc}"
 
 
 def _weekly_margin_long_cache(config: Config, client) -> pd.Series:
@@ -383,7 +387,7 @@ def _weekly_margin_long_cache(config: Config, client) -> pd.Series:
     cached = _load_series_cache(path)
     jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
     # MTM の建値推定に十分な履歴（正規化窓 lookback + 助走）を金曜系列で確保
-    start = jst_today - timedelta(days=int(config.lookback_days * 3) + 60)
+    start = _fetch_start(config, int(config.lookback_days * 3) + 60, warmup_days=365)
     fridays = pd.date_range(start=start, end=jst_today, freq="W-FRI")
     have = {d.normalize() for d in cached.index}
     missing = [d for d in fridays if d.normalize() not in have]
@@ -404,6 +408,8 @@ def _weekly_margin_long_cache(config: Config, client) -> pd.Series:
         merged = pd.concat([cached, pd.Series(new)]).sort_index()
         merged = merged[~merged.index.duplicated(keep="last")]
         _save_series_cache(path, merged)
+    print(f"[weekly_margin] 今回取得 {len(new)} 週 / 残り未取得 "
+          f"{max(len(missing) - min(len(missing), max_new), 0)} 週（{start} 以降）")
     return merged
 
 
@@ -512,69 +518,160 @@ def _provide_margin_pl(config: Config, client, series: dict, errors: dict,
     series["margin_pl_ratio"] = IndicatorSeries("margin_pl_ratio", final, src)
 
 
-def _provide_new_high_low(config: Config, client, series: dict, errors: dict) -> None:
-    """#3 新高値 − 新安値（東証全体・ネット）：全銘柄 AdjC の52週(252営業日)高安から
-    新高値/新安値銘柄数を数えネット値を算出。全銘柄終値を gzip CSV に増分キャッシュし
-    （web/public/data/series/stock_closes.csv.gz）、1実行あたり一定日数ずつ積み増す。"""
-    from datetime import datetime, timedelta
+BREADTH_NHL_WIN = 245      # 52週 ≒ 245営業日（日本市場）
+BREADTH_KEEP_DAYS = 260    # 終値キャッシュに常時残す直近営業日数（52週窓＋余裕）
+
+
+def _breadth_needed_dates(cal: pd.DatetimeIndex, missing_ad, missing_nhl,
+                          win: int = BREADTH_NHL_WIN) -> set:
+    """派生値が欠けている日を計算するのに必要な終値の日付集合（営業日カレンダー上）。
+
+    騰落(#2)は当日と前営業日、新高安(#3)は当日を含む直近 win 営業日の終値が要る。
+    """
+    pos = {d: i for i, d in enumerate(cal)}
+    need: set = set()
+    for d in missing_ad:
+        i = pos.get(d)
+        if i is None or i == 0:
+            continue
+        need.update((cal[i - 1], cal[i]))
+    for d in missing_nhl:
+        i = pos.get(d)
+        if i is None or i < win - 1:
+            continue
+        need.update(cal[i - win + 1: i + 1])
+    return need
+
+
+def _provide_breadth(config: Config, client, series: dict, errors: dict) -> None:
+    """#2 騰落レシオ・#3 新高値−新安値：全銘柄の日次終値（共通キャッシュ）から両方を算出。
+
+    - 派生値は小さな CSV に恒久保存：advance_decline.csv（date, adv, dec）/ new_high_low.csv
+      （date, net）。過去日の再計算に終値を持ち続ける必要がない。
+    - 欠けている派生値の計算に必要な終値だけを取得（直近の日から、1回 JQUANTS_BREADTH_MAX_FETCH 日）。
+    - 終値キャッシュは「直近 260 営業日」と「まだ計算待ちの日に必要な日」だけを残して縮める。
+    - 騰落の母集団は現在のプライム銘柄（過去日の生存者バイアスあり）。新高安は全上場銘柄。
+    """
     from pathlib import Path
+
+    from .fetchers.derive import adv_dec_from_closes, advance_decline_ratio, new_high_low_from_closes
 
     try:
         engine_root = Path(__file__).resolve().parents[1]
         base = (engine_root / config.output.get("latest_path", "../web/public/data/latest.json")).resolve().parent / "series"
         base.mkdir(parents=True, exist_ok=True)
         closes_path = base / "stock_closes.csv.gz"
+        ad_path = _series_cache_path(config, "advance_decline")
+        nhl_path = _series_cache_path(config, "new_high_low")
 
+        # --- キャッシュ読込 ---
         if closes_path.exists():
-            cache = pd.read_csv(closes_path, compression="gzip")
+            cache = pd.read_csv(closes_path, compression="gzip", dtype={"code": str})
             cache["date"] = pd.to_datetime(cache["date"])
         else:
             cache = pd.DataFrame(columns=["date", "code", "adjc"])
+        if ad_path.exists():
+            adf = pd.read_csv(ad_path)
+            adf["date"] = pd.to_datetime(adf["date"])
+            ad = adf.set_index("date")[["adv", "dec"]].sort_index()
+        else:
+            ad = pd.DataFrame(columns=["adv", "dec"], dtype="float64")
+        nhl = _load_series_cache(nhl_path)
 
-        jst_today = (datetime.utcnow() + timedelta(hours=9)).date()
-        # 52週窓のネット系列を lookback ぶん得るには概ね 2*lookback 営業日が必要
-        window_days = int(config.lookback_days * 2 * 1.5) + 30
-        start = jst_today - timedelta(days=window_days)
-        target = pd.bdate_range(start=start, end=jst_today)
-        have = set(pd.to_datetime(cache["date"]).dt.normalize().unique()) if len(cache) else set()
-        missing = [d for d in target if d.normalize() not in have]
-        max_new = int(os.environ.get("JQUANTS_NHL_MAX_FETCH", "30"))
-        new_frames = []
-        for d in missing[-max_new:]:
+        # --- 対象日と必要な終値 ---
+        target_start = pd.Timestamp(_fetch_start(config, int(config.lookback_days * 1.6) + 40))
+        # 52週窓のため、終値は対象初日の約400暦日前から要る
+        cal = _trading_days(client, (target_start - pd.Timedelta(days=400)).date())
+        target = [d for d in cal if d >= target_start]
+        have_ad = {d.normalize() for d in ad.index}
+        have_nhl = {d.normalize() for d in nhl.index}
+        missing_ad = [d for d in target if d not in have_ad]
+        missing_nhl = [d for d in target if d not in have_nhl]
+        need = _breadth_needed_dates(cal, missing_ad, missing_nhl)
+        have_close = set(pd.to_datetime(cache["date"]).dt.normalize().unique()) if len(cache) else set()
+        to_fetch = sorted(d for d in need if d not in have_close)
+        max_new = int(os.environ.get("JQUANTS_BREADTH_MAX_FETCH")
+                      or os.environ.get("JQUANTS_NHL_MAX_FETCH") or "30")
+        batch = to_fetch[-max_new:]  # 直近の日から（日次の最新値を常に優先）
+        frames = []
+        for d in batch:
             closes = client.equities_close_by_date(d.strftime("%Y-%m-%d"))
             if len(closes) == 0:
                 continue
-            new_frames.append(pd.DataFrame({
+            frames.append(pd.DataFrame({
                 "date": pd.Timestamp(d.date()), "code": closes.index.astype(str),
                 "adjc": closes.values.round(2),
             }))
-        if new_frames:
-            cache = pd.concat([cache] + new_frames, ignore_index=True)
-            cache = cache[pd.to_datetime(cache["date"]) >= pd.Timestamp(start)]
+        if frames:
+            cache = pd.concat([cache] + frames, ignore_index=True)
             cache = cache.drop_duplicates(subset=["date", "code"], keep="last")
+        print(f"[breadth] 終値 今回取得 {len(frames)} 日 / 残り未取得 "
+              f"{max(len(to_fetch) - len(batch), 0)} 日（{target_start.date()} 以降の派生値用）")
+
+        piv = (cache.pivot_table(index="date", columns="code", values="adjc").sort_index()
+               if len(cache) else pd.DataFrame())
+        pdates = set(piv.index)
+
+        # --- #2 騰落：前営業日と当日の終値がそろった欠損日を計算 ---
+        pos = {d: i for i, d in enumerate(cal)}
+        ad_new = {}
+        universe = None
+        for d in missing_ad:
+            i = pos.get(d)
+            if i is None or i == 0 or d not in pdates or cal[i - 1] not in pdates:
+                continue
+            if universe is None:
+                universe = client.listed_codes_by_market("プライム")
+            adv, dec = adv_dec_from_closes(piv.loc[cal[i - 1]], piv.loc[d], universe)
+            ad_new[pd.Timestamp(d)] = {"adv": adv, "dec": dec}
+        if ad_new:
+            ad = pd.concat([ad, pd.DataFrame.from_dict(ad_new, orient="index")]).sort_index()
+            ad = ad[~ad.index.duplicated(keep="last")]
+            out = ad.copy()
+            out.insert(0, "date", pd.DatetimeIndex(out.index).strftime("%Y-%m-%d"))
+            out.to_csv(ad_path, index=False)
+
+        # --- #3 新高安：52週窓の終値がすべてそろった欠損日を計算 ---
+        nhl_new = {}
+        if len(piv):
+            calc = [d for d in missing_nhl
+                    if pos.get(d) is not None and pos[d] >= BREADTH_NHL_WIN - 1
+                    and all(x in pdates for x in cal[pos[d] - BREADTH_NHL_WIN + 1: pos[d] + 1])]
+            if calc:
+                net = new_high_low_from_closes(piv, win=BREADTH_NHL_WIN)
+                for d in calc:
+                    if d in net.index:
+                        nhl_new[pd.Timestamp(d)] = float(net.loc[d])
+        if nhl_new:
+            nhl = pd.concat([nhl, pd.Series(nhl_new)]).sort_index()
+            nhl = nhl[~nhl.index.duplicated(keep="last")]
+            _save_series_cache(nhl_path, nhl)
+
+        # --- 終値キャッシュの縮小（直近 260 営業日 ＋ まだ計算待ちの日に必要な日）---
+        if len(cache):
+            still_ad = [d for d in missing_ad if pd.Timestamp(d) not in ad_new]
+            still_nhl = [d for d in missing_nhl if pd.Timestamp(d) not in nhl_new]
+            keep = set(cal[-BREADTH_KEEP_DAYS:]) | _breadth_needed_dates(cal, still_ad, still_nhl)
+            dn = pd.to_datetime(cache["date"]).dt.normalize()
+            cache = cache[dn.isin(keep)]
             cache.to_csv(closes_path, index=False, compression="gzip")
 
-        if len(cache) == 0:
-            raise FetchError("new_high_low: 終値キャッシュ空（初回は数回の実行で積み増し）")
-
-        piv = cache.pivot_table(index="date", columns="code", values="adjc").sort_index()
-        # 52週高安。日本市場は年間約245営業日のため窓は245（米国基準の252だと1年貯めても
-        # 到達せず計算不能になる）。min_periods は約40週分あれば52週高安を近似計算し、
-        # 期間が貯まるほど本来の52週窓に近づく（キャッシュ増分に対して堅牢）。
-        win = 245
-        minp = 200
-        roll_max = piv.rolling(win, min_periods=minp).max()
-        roll_min = piv.rolling(win, min_periods=minp).min()
-        new_high = (piv >= roll_max) & roll_max.notna()
-        new_low = (piv <= roll_min) & roll_min.notna()
-        net = (new_high.sum(axis=1) - new_low.sum(axis=1))[roll_max.notna().any(axis=1)]
-        if len(net) == 0:
-            raise FetchError("new_high_low: 52週高安の蓄積待ち（約40週分の全銘柄終値が必要）")
-        series["new_high_low"] = IndicatorSeries("new_high_low", net.astype(float), "jquants_v2")
-    except FetchError as exc:
-        errors["new_high_low"] = str(exc)
+        # --- 指標系列 ---
+        if len(ad):
+            ratio = advance_decline_ratio(ad["adv"], ad["dec"], window=25)
+            if len(ratio):
+                series["advance_decline_25"] = IndicatorSeries("advance_decline_25", ratio, "jquants_v2")
+            else:
+                errors["advance_decline_25"] = "advance_decline: 25日ぶんの蓄積待ち"
+        else:
+            errors["advance_decline_25"] = "advance_decline: データ未取得（初回は数回の実行で積み増し）"
+        if len(nhl):
+            series["new_high_low"] = IndicatorSeries("new_high_low", nhl.astype(float), "jquants_v2")
+        else:
+            errors["new_high_low"] = "new_high_low: 52週高安の蓄積待ち（245営業日分の全銘柄終値が必要）"
     except Exception as exc:  # noqa: BLE001
-        errors["new_high_low"] = f"new_high_low: {exc}"
+        errors.setdefault("advance_decline_25", f"breadth: {exc}")
+        errors.setdefault("new_high_low", f"breadth: {exc}")
 
 
 def _provide_real(config: Config, variant: Variant,
@@ -618,8 +715,7 @@ def _provide_real(config: Config, variant: Variant,
         _provide_option_skew(config, client, series, errors)
         _provide_short_ratio(config, client, series, errors)
         _provide_safe_haven(config, client, variant, series, errors)
-        _provide_advance_decline(config, client, series, errors)
-        _provide_new_high_low(config, client, series, errors)
+        _provide_breadth(config, client, series, errors)
     else:
         for k in ("option_skew", "short_selling_ratio", "safe_haven",
                   "advance_decline_25", "new_high_low"):

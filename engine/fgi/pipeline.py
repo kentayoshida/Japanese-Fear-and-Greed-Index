@@ -82,10 +82,12 @@ def build_history(
     raw_series: dict[str, IndicatorSeries],
     dates: list[pd.Timestamp],
     index_series: IndicatorSeries | None = None,
+    component_rows: list | None = None,
 ) -> list[dict]:
     """各日付の合成スコア時系列を返す（history.json 用）。
 
     coverage が 0 の日（全指標欠損）はスコア None になるため出力から除外する。
+    component_rows（list）を渡すと、評価用に各日の指標別 raw/score を横持ちで追記する。
     index_series（版の株価指数）を渡すと、その日時点(point-in-time)の指数終値を
     `index` として各行に添える（チャートのオーバーレイ用）。
     """
@@ -106,6 +108,14 @@ def build_history(
             if len(iw):
                 row["index"] = round(float(iw.iloc[-1]), 2)
         out.append(row)
+        if component_rows is not None:
+            # 評価用：同じ日に計算済みのコンポーネント（生値・スコア・stale）を横持ちで積む
+            crow = {"date": row["date"], "score": row["score"], "coverage": row["coverage"],
+                    "index": row.get("index")}
+            for c in result["components"]:
+                crow[f"{c['id']}_raw"] = c["raw"]
+                crow[f"{c['id']}_score"] = None if c["stale"] else c["score"]
+            component_rows.append(crow)
     return out
 
 

@@ -9,6 +9,12 @@
 # 252 ≒ 1年。短いほど現在レジームに敏感、長いほど安定だが鈍い。
 lookback_days: 252
 
+# 生値の取得開始日。逆張り評価（2024-01〜）で全8指標をそろえるため、パーセンタイルの
+# 助走（252営業日）ぶん前から取得する。52週高安の全銘柄終値はさらに約1年前から取る。
+# 増分キャッシュの指標は、1回の実行で MAX_FETCH 件ずつ過去へ積み増す（初回は手動実行の
+# backfill_max_fetch で一気に充填）。
+data_start: "2022-11-01"
+
 # 合成スコアの判定バンド（§5.1）。境界は [下限, 上限) で評価する。
 bands:
   - { name: "Extreme Fear", label_ja: "極度の恐怖", min: 0,  max: 25 }
@@ -120,6 +126,9 @@ variants:
       csv_url: "https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_daily_jp.csv"
       encoding: cp932
       label_ja: "日経225"
+      # 日経公式CSVの初日より前は、日経225連動ETF(1321)の調整後終値で補う（スケール合わせ・
+      # CSVの値を常に優先）。data_start まで遡るための代替系列。
+      backfill_proxy_code: "1321"
       min: 3000
       max: 200000
   - key: topix
