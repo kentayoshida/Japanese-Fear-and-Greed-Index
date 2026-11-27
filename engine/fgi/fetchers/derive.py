@@ -39,6 +39,58 @@ def new_high_low_net(new_highs: pd.Series, new_lows: pd.Series) -> pd.Series:
     return net
 
 
+def adv_dec_from_closes(
+    prev: pd.Series, cur: pd.Series, universe: set[str] | None = None
+) -> tuple[float, float]:
+    """#2 素材：前営業日→当日の終値（index=銘柄コード）から値上がり/値下がり銘柄数を数える。
+
+    universe（例: プライム銘柄コード集合）を渡すとその銘柄に限定。両日に終値がある銘柄のみ比較。
+    """
+    p = pd.to_numeric(prev, errors="coerce").dropna()
+    c = pd.to_numeric(cur, errors="coerce").dropna()
+    if universe is not None:
+        p = p[p.index.isin(universe)]
+        c = c[c.index.isin(universe)]
+    common = c.index.intersection(p.index)
+    diff = c[common] - p[common]
+    return float((diff > 0).sum()), float((diff < 0).sum())
+
+
+def new_high_low_from_closes(piv: pd.DataFrame, win: int = 245, minp: int | None = None) -> pd.Series:
+    """#3 全銘柄終値（行=営業日, 列=銘柄）から 52週新高値数 − 新安値数 のネット系列。
+
+    日本市場は年間約245営業日のため窓は245。当日終値が窓内の最高値以上なら新高値、
+    最安値以下なら新安値。min_periods 未満の日（窓が埋まらない日）は出力しない。
+    """
+    minp = win if minp is None else minp
+    piv = piv.sort_index()
+    roll_max = piv.rolling(win, min_periods=minp).max()
+    roll_min = piv.rolling(win, min_periods=minp).min()
+    new_high = (piv >= roll_max) & roll_max.notna()
+    new_low = (piv <= roll_min) & roll_min.notna()
+    net = (new_high.sum(axis=1) - new_low.sum(axis=1))[roll_max.notna().any(axis=1)]
+    return net.astype(float)
+
+
+def stitch_with_proxy(primary: pd.Series, proxy: pd.Series, overlap: int = 20) -> pd.Series:
+    """primary の初日より前を proxy で補う（例：日経公式CSVの前を日経225連動ETFで延長）。
+
+    重なる最初の overlap 日の比率（primary/proxy）の中央値で proxy をスケールし、
+    primary の初日より前だけを付け足す。重なりが無ければ primary をそのまま返す。
+    primary の値は常に優先（上書きしない）。
+    """
+    p = pd.to_numeric(primary, errors="coerce").dropna().sort_index()
+    x = pd.to_numeric(proxy, errors="coerce").dropna().sort_index()
+    if p.empty or x.empty:
+        return p
+    common = p.index.intersection(x.index)[:overlap]
+    if len(common) == 0:
+        return p
+    ratio = float((p[common] / x[common]).median())
+    early = x[x.index < p.index[0]] * ratio
+    return pd.concat([early, p]).sort_index()
+
+
 def put_call_ratio(
     option_df: pd.DataFrame,
     *,

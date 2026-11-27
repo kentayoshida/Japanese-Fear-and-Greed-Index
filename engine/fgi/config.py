@@ -59,6 +59,8 @@ class Config:
     output: dict[str, str]
     sources: dict[str, Any] = field(default_factory=dict)
     variants: list[Variant] = field(default_factory=list)
+    # 生値の取得開始日（YYYY-MM-DD）。評価用に過去へ遡る下限。None なら lookback 基準のみ。
+    data_start: str | None = None
 
     def indicator(self, indicator_id: str) -> Indicator:
         for ind in self.indicators:
@@ -138,6 +140,7 @@ def load_config(path: str | Path | None = None) -> Config:
         output=raw.get("output", {}),
         sources=sources,
         variants=variants,
+        data_start=(str(raw["data_start"]) if raw.get("data_start") else None),
     )
 
 

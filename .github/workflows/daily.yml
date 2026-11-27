@@ -14,8 +14,8 @@ on:
         type: choice
         options: ["real", "demo"]
         default: "real"
-      option_max_fetch:
-        description: "#5 スキューの過去分を1回で取得する最大営業日数（初回充填は 300 推奨。空=既定40）"
+      backfill_max_fetch:
+        description: "過去データ充填：増分キャッシュ（#2/#3 全銘柄終値・#5 スキュー・#6 週次信用残）を1回で取得する最大件数。data_start(2022-11)までの初回充填は 1500 推奨。空=既定（日次運用）"
         type: string
         default: ""
 
@@ -26,6 +26,8 @@ concurrency:
 jobs:
   recompute:
     runs-on: ubuntu-latest
+    # 過去データ充填（backfill_max_fetch 指定）は数時間かかるため上限を長めに取る
+    timeout-minutes: 340
     permissions:
       contents: write # 生成 JSON をコミットするため
     env:
@@ -35,8 +37,10 @@ jobs:
       JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
       # 後方互換（v1 名・任意）
       JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
-      # #5 オプション・スキューの過去分充填数（手動実行の入力。cron 時は空＝既定40）
-      JQUANTS_OPTION_MAX_FETCH: ${{ github.event.inputs.option_max_fetch }}
+      # 過去データ充填の取得件数（手動実行の入力。cron 時は空＝各プロバイダの既定値）
+      JQUANTS_OPTION_MAX_FETCH: ${{ github.event.inputs.backfill_max_fetch }}
+      JQUANTS_BREADTH_MAX_FETCH: ${{ github.event.inputs.backfill_max_fetch }}
+      JQUANTS_WM_MAX_FETCH: ${{ github.event.inputs.backfill_max_fetch }}
     steps:
       - uses: actions/checkout@v4
 

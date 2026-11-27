@@ -92,7 +92,9 @@ def main() -> int:
             latest["fetch_errors"] = errors  # 取得不能だった指標と理由（透明性）
 
         dates = union_business_dates(raw_series, start=start)
-        history = build_history(vcfg, raw_series, dates, index_series=equity)
+        comp_rows: list[dict] = []
+        history = build_history(vcfg, raw_series, dates, index_series=equity,
+                                component_rows=comp_rows)
 
         # 指標カードの生値チャート（直近252営業日ぶんの生値・CNN型）
         chart_dates = dates[-252:] if len(dates) > 252 else dates
@@ -105,6 +107,9 @@ def main() -> int:
         vhistory = _variant_path(history_base, v.key)
         vlatest.write_text(json.dumps(latest, ensure_ascii=False, indent=2), encoding="utf-8")
         vhistory.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+        # 評価用：指標別の履歴（生値・スコア）。evaluate.py が API キーなしで再現できるように。
+        vcomp = history_base.with_name(f"history_components.{v.key}.csv")
+        pd.DataFrame(comp_rows).to_csv(vcomp, index=False, float_format="%.6g")
         # 既定版は latest.json / history.json も兼ねる（後方互換）
         if v.default:
             latest_base.write_text(json.dumps(latest, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -62,9 +62,7 @@ class JQuantsClient:
         params = {k: v for k, v in (params or {}).items() if v is not None}
         out: list[dict] = []
         while True:
-            resp = requests.get(
-                f"{self.base_url}{path}", headers=headers, params=params, timeout=self.timeout
-            )
+            resp = self._request_with_retry(path, headers, params)
             resp.raise_for_status()
             body = resp.json()
             data = body.get("data")
@@ -77,6 +75,38 @@ class JQuantsClient:
                 break
             params["pagination_key"] = pagination
         return out
+
+    RETRY_STATUS = {429, 500, 502, 503, 504}
+
+    def _request_with_retry(self, path: str, headers: dict, params: dict,
+                            max_retries: int = 5, base_sleep: float = 2.0):
+        """レート制限(429)・一時的なサーバエラー(5xx)・通信エラーを指数バックオフで再試行。
+
+        過去データの充填では千件規模の連続取得になるため、単発の失敗で取りこぼさない。
+        """
+        import time
+
+        last_exc: Exception | None = None
+        for attempt in range(max_retries + 1):
+            try:
+                resp = requests.get(
+                    f"{self.base_url}{path}", headers=headers, params=params, timeout=self.timeout
+                )
+            except requests.RequestException as exc:
+                last_exc = exc
+            else:
+                if resp.status_code not in self.RETRY_STATUS:
+                    return resp
+                last_exc = requests.HTTPError(f"HTTP {resp.status_code}", response=resp)
+                retry_after = resp.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit() and attempt < max_retries:
+                    time.sleep(min(float(retry_after), 60.0))
+                    continue
+            if attempt < max_retries:
+                time.sleep(min(base_sleep * (2 ** attempt), 60.0))
+        if isinstance(last_exc, requests.HTTPError) and last_exc.response is not None:
+            return last_exc.response  # 呼び出し側の raise_for_status に委ねる
+        raise last_exc  # type: ignore[misc]
 
     # ----- データ取得 -------------------------------------------------------
     @staticmethod
